@@ -14,3 +14,4 @@ dependencyResolutionManagement {
 }
 rootProject.name = "NowSteering"
 include(":app")
+include(":nowsteering")
