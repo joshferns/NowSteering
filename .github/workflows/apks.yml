@@ -1,0 +1,59 @@
+name: Build APKs
+
+on:
+  push:
+    paths:
+      - "app/**"
+      - "nowsteering/**"
+      - "gradle/**"
+      - "*.gradle.kts"
+      - ".github/workflows/apks.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Unit tests
+        run: ./gradlew :nowsteering:testDebugUnitTest --no-daemon
+
+      - name: Build debug APKs
+        run: ./gradlew :app:assembleDebug :nowsteering:assembleDebug --no-daemon
+
+      - name: Rename APKs
+        run: |
+          cp app/build/outputs/apk/debug/app-debug.apk NowSteering-probe.apk
+          cp nowsteering/build/outputs/apk/debug/nowsteering-debug.apk NowSteering.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: apks
+          path: "*.apk"
+
+      # Each build is its own release; "latest" always points at the newest one, so the phone links
+      # .../releases/latest/download/NowSteering.apk and .../NowSteering-probe.apk never change.
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: build-${{ github.run_number }}
+          name: Build ${{ github.run_number }} (${{ github.ref_name }})
+          target_commitish: ${{ github.sha }}
+          body: |
+            NowSteering.apk (the app) and NowSteering-probe.apk (Phase 0 probe), commit ${{ github.sha }}.
+            Both install over their previous builds (same signing key).
+          files: |
+            NowSteering.apk
+            NowSteering-probe.apk
+          make_latest: true
