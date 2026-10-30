@@ -1,4 +1,4 @@
-# In-car test script (Phase 0, ~15 min, parked)
+# In-car test script (Phase 0, ~17 min, parked)
 
 **Before you go (at home, ~3 min):** install the latest APK and do the one-time
 setup in the README. Check the status line shows `listener=true battExempt=true`.
@@ -39,27 +39,35 @@ tap **Add note** — this lines the log up with your photos.
 10. Select **c) pause → update → play**. **Start auto** (5 s), watch 30 s, note the same. **Stop auto**.
 11. Pick the best mode from 8–10, set seconds to `1`, **Start auto**, watch 15 s: does the car keep up? **Stop auto**.
 
-### Buttons (2 min)
-12. With the session still running, press each button in this order, waiting ~3 s each so the green flash box updates:
-    1) steering **Next** short, 2) steering **Previous** short, 3) **Next** held 2 s, 4) **Previous** held 2 s,
-    5) **Next** double-press, 6) any **play/pause / mute / source / mode** button on wheel or head unit,
-    7) the same **Next/Previous (seek/track)** on the head unit itself.
-    Note any button that did *not* change the green box.
+### Buttons and gestures (4 min)
+Session still running. The **green box** shows the last raw key (`NEXT DOWN r0`, `NEXT UP r0`…);
+the **blue box** shows the recognised gesture (`NEXT SINGLE`, `NEXT DOUBLE`, `NEXT LONG HOLD`…).
+For each step: do the gesture, wait 2 s, note what the **blue box** says (and "nothing" if neither box changed).
+Add a note with the step number before each one (e.g. `12c`) so the log lines up.
+
+12. Steering wheel **Next**:
+    a) single tap · b) double tap · c) triple tap (fast, like a double-click) ·
+    d) hold 2 s, then release · e) hold 5 s, then release (watch if the car itself starts fast-forwarding)
+13. Steering wheel **Previous**: same five, a) to e).
+14. Head unit **play/pause** button: a) tap once (pause) · b) tap again (play) · c) hold 2 s.
+15. Head unit's own **next / previous (seek/track)** buttons: a) tap each once · b) hold each 2 s.
+16. Steering **SOURCE**, **Volume +**, **Volume −**: one press each. These probably won't reach the app; just note if either box changes.
+17. Only if double or triple showed up as `SINGLE` in 12–13: in section 4b set *tap window ms* to `700`, **Apply timings**, and redo 12b and 12c.
 
 ### Coexistence with YouTube Music (3 min)
-13. Tap **STOP session**. Open YouTube Music and play a song. Note: car shows the YTM song? 📷
-14. Back in NS Probe: **untick** Request audio focus; tick **Forward next/prev/play/pause**; select mode **b**.
+18. Tap **STOP session**. Open YouTube Music and play a song. Note: car shows the YTM song? 📷
+19. Back in NS Probe: **untick** Request audio focus; tick **Forward next/prev/play/pause**; select mode **b**.
     Tap **START session**. Note: is YTM music **still audible**? What does the car show — `Now Steering` or the YTM song? 📷
     Look at *Active sessions* in section 5 and note which app is listed first.
-15. Press steering **Next**, then **Previous**, then play/pause twice. Note: did YouTube Music skip / pause / resume?
-16. Tick **Mirror target's title/artist/album**. Note: does the car now show the YTM song through our session? 📷
+20. Press steering **Next**, then **Previous**, then the head-unit **play/pause** twice. Note: did YouTube Music skip / pause / resume?
+21. Tick **Mirror target's title/artist/album**. Note: does the car now show the YTM song through our session? 📷
     In YouTube Music on the phone, skip to the next song. Does the car follow? Wait for the new song to play 20 s: does the car still show our session?
     If the car switched to YTM's own display, tap **Re-grab** in section 1 and note if it comes back.
-17. Variation: tap **STOP session**, **tick** Request audio focus, YTM still playing, tap **START session**. Note: does YTM pause? (Expected yes.)
+22. Variation: tap **STOP session**, **tick** Request audio focus, YTM still playing, tap **START session**. Note: does YTM pause? (Expected yes.)
 
 ### Wrap up (1 min)
-18. Add note `end`. Tap **STOP session**. Turn the car off (or disconnect Bluetooth) and wait 10 s so the disconnect is logged.
-19. Tap **Share text** (or **Share file** if the text is huge) and send it to yourself. Paste it back to me with your notes and photos.
+23. Add note `end`. Tap **STOP session**. Turn the car off (or disconnect Bluetooth) and wait 10 s so the disconnect is logged.
+24. Tap **Share text** (or **Share file** if the text is huge) and send it to yourself. Paste it back to me with your notes and photos.
 
 **Notes template** (copy into your reply):
 ```
@@ -68,8 +76,10 @@ tap **Add note** — this lines the log up with your photos.
 4: title=… artist=… album=…
 5-7: ok / box / blank per letter: …
 8 a): …   9 b): …   10 c): …   11 1s: …
-12 buttons that did nothing: …
-13: …  14: audible? … car shows … first session …
-15: …  16: …  17: …
+12 next  a=… b=… c=… d=… e=…  (car fast-forwarded on e? …)
+13 prev  a=… b=… c=… d=… e=…
+14 play/pause  a=… b=… c=…   15 HU next/prev  a=… b=…   16 source/vol: …   17 (700ms) b=… c=…
+18: …  19: audible? … car shows … first session …
+20: …  21: …  22: …
 anything odd: …
 ```

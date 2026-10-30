@@ -28,7 +28,8 @@ The status lines at the top should then read `listener=true battExempt=true noti
 ## What's in the app
 | Section | What it does |
 |---|---|
-| Flash (top, green) | Last button / transport command, large text, with time |
+| Flash (top, green) | Last raw key (DOWN / UP, repeat count) or transport command, large text, with time |
+| Gesture (blue) | Per key: SINGLE / DOUBLE / TRIPLE tap, LONG HOLD (and tap + hold). Tap window and hold threshold adjustable in section 4b, default 400 ms |
 | 1. Media session | Foreground service with a `MediaSession` and a looping near-silent `AudioTrack` (±1 LSB, inaudible). Start / Stop / Re-grab. "Request audio focus" off = YouTube Music keeps playing |
 | 2. Refresh mode | a) metadata only, b) fake track change (new media ID + duration), c) pause → update → play |
 | 3. Text tester | Title / Artist / Album: preset strings (rulers, arrows, box, blocks, symbols, Devanagari, emoji…) or custom text; send each field or all |
