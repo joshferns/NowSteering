@@ -44,9 +44,9 @@ object Gestures {
     fun onKey(ke: KeyEvent) {
         if (ke.action == KeyEvent.ACTION_DOWN) {
             if (ke.repeatCount > 0) return // auto-repeat while held; raw log keeps it
-            press(ke.keyCode, ke.eventTime, "key")
+            press(ke.keyCode, SystemClock.uptimeMillis(), "key")
         } else if (ke.action == KeyEvent.ACTION_UP) {
-            release(ke.keyCode, ke.eventTime)
+            release(ke.keyCode, SystemClock.uptimeMillis())
         }
     }
 

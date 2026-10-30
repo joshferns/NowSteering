@@ -157,6 +157,11 @@ class MainActivity : Activity() {
             ProbeLog.log("UI", "request audio focus = $it")
         }
         row(button("START session") {
+            if (ProbeService.instance != null) {
+                ProbeLog.log("UI", "start tapped but session already running: settings unchanged")
+                toast("Already running. Tap STOP first so new settings apply.")
+                return@button
+            }
             ProbeLog.log("UI", "start session tapped")
             startForegroundService(Intent(this, ProbeService::class.java))
         }, button("STOP session") {

@@ -53,7 +53,7 @@ class ProbeService : Service() {
     private var trackStart = SystemClock.elapsedRealtime()
     private var playing = true
 
-    private var lastKeyTime = 0L // KeyEvent.eventTime, uptime base
+    private var lastKeyTime = 0L // when we received the last KeyEvent (uptime); the car's events carry eventTime=0
 
     /** True if a KeyEvent arrived recently, i.e. a transport callback probably came from it. */
     private fun keyRecent() = lastKeyTime != 0L && SystemClock.uptimeMillis() - lastKeyTime < 1000
@@ -293,10 +293,12 @@ class ProbeService : Service() {
                     KeyEvent.ACTION_UP -> "UP"
                     else -> "action${ke.action}"
                 }
-                val gap = if (lastKeyTime == 0L) "-" else "${ke.eventTime - lastKeyTime}ms"
-                lastKeyTime = ke.eventTime
+                val now = SystemClock.uptimeMillis()
+                val gap = if (lastKeyTime == 0L) "-" else "${now - lastKeyTime}ms"
+                lastKeyTime = now
                 val msg = "${KeyEvent.keyCodeToString(ke.keyCode)} (${ke.keyCode}) $action repeat=${ke.repeatCount} " +
-                    "held=${ke.eventTime - ke.downTime}ms gapSincePrevKey=$gap eventTime=${ke.eventTime} " +
+                    (if (ke.eventTime == 0L) "synthetic(eventTime=0) " else "held=${ke.eventTime - ke.downTime}ms ") +
+                    "gapSincePrevKey=$gap " +
                     "longPress=${ke.isLongPress} flags=0x${Integer.toHexString(ke.flags)} " +
                     "dev=${ke.deviceId} src=0x${Integer.toHexString(ke.source)}"
                 ProbeLog.log("KEY", msg)
