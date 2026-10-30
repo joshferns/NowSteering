@@ -1,3 +1,5 @@
+import java.time.Instant
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -5,6 +7,7 @@ plugins {
 
 val runNumber = (System.getenv("GITHUB_RUN_NUMBER") ?: "1").toInt()
 val gitSha = (System.getenv("GITHUB_SHA") ?: "local").take(7)
+val buildTime = Instant.now().toString()
 
 android {
     namespace = "com.nowsteering.probe"
@@ -17,7 +20,7 @@ android {
         versionCode = runNumber
         versionName = "0.1.$runNumber-probe"
         buildConfigField("String", "GIT_SHA", "\"$gitSha\"")
-        buildConfigField("String", "BUILD_TIME", "\"${java.time.Instant.now()}\"")
+        buildConfigField("String", "BUILD_TIME", "\"$buildTime\"")
     }
 
     // Fixed debug key committed to the repo so every CI build installs over the previous one.
