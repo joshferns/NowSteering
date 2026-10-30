@@ -53,6 +53,11 @@ class ProbeService : Service() {
     private var trackStart = SystemClock.elapsedRealtime()
     private var playing = true
 
+    private var lastKeyTime = 0L // KeyEvent.eventTime, uptime base
+
+    /** True if a KeyEvent arrived recently, i.e. a transport callback probably came from it. */
+    private fun keyRecent() = lastKeyTime != 0L && SystemClock.uptimeMillis() - lastKeyTime < 1000
+
     private var autoTask: Runnable? = null
     var autoCount = 0
         private set
@@ -271,7 +276,7 @@ class ProbeService : Service() {
     }
 
     private fun command(name: String, block: () -> Unit = {}) {
-        ProbeLog.log("CMD", name)
+        ProbeLog.log("CMD", name + if (keyRecent()) "" else " (no KeyEvent: direct transport control)")
         flash("$name\n${SimpleDateFormat("HH:mm:ss.SSS", Locale.US).format(Date())}")
         block()
     }
@@ -288,10 +293,14 @@ class ProbeService : Service() {
                     KeyEvent.ACTION_UP -> "UP"
                     else -> "action${ke.action}"
                 }
+                val gap = if (lastKeyTime == 0L) "-" else "${ke.eventTime - lastKeyTime}ms"
+                lastKeyTime = ke.eventTime
                 val msg = "${KeyEvent.keyCodeToString(ke.keyCode)} (${ke.keyCode}) $action repeat=${ke.repeatCount} " +
-                    "held=${ke.eventTime - ke.downTime}ms longPress=${ke.isLongPress} flags=0x${Integer.toHexString(ke.flags)} " +
+                    "held=${ke.eventTime - ke.downTime}ms gapSincePrevKey=$gap eventTime=${ke.eventTime} " +
+                    "longPress=${ke.isLongPress} flags=0x${Integer.toHexString(ke.flags)} " +
                     "dev=${ke.deviceId} src=0x${Integer.toHexString(ke.source)}"
                 ProbeLog.log("KEY", msg)
+                Gestures.onKey(ke)
                 flash("${KeyEvent.keyCodeToString(ke.keyCode).removePrefix("KEYCODE_")} $action r${ke.repeatCount}\n" +
                     SimpleDateFormat("HH:mm:ss.SSS", Locale.US).format(Date()))
             } else {
@@ -313,8 +322,15 @@ class ProbeService : Service() {
             }
         }
 
-        override fun onSkipToNext() = command("onSkipToNext") { forward("next") { it.skipToNext() } }
-        override fun onSkipToPrevious() = command("onSkipToPrevious") { forward("previous") { it.skipToPrevious() } }
+        override fun onSkipToNext() = command("onSkipToNext") {
+            if (!keyRecent()) Gestures.onTransportOnly(KeyEvent.KEYCODE_MEDIA_NEXT)
+            forward("next") { it.skipToNext() }
+        }
+
+        override fun onSkipToPrevious() = command("onSkipToPrevious") {
+            if (!keyRecent()) Gestures.onTransportOnly(KeyEvent.KEYCODE_MEDIA_PREVIOUS)
+            forward("previous") { it.skipToPrevious() }
+        }
         override fun onStop() = command("onStop") { forward("stop") { it.stop() } }
         override fun onFastForward() = command("onFastForward") { forward("fastForward") { it.fastForward() } }
         override fun onRewind() = command("onRewind") { forward("rewind") { it.rewind() } }

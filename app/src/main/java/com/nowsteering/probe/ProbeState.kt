@@ -21,5 +21,10 @@ object ProbeState {
     /** Last button / transport event, shown in large text. */
     @Volatile var flash = "(no button yet)"
 
+    /** Last recognised gesture (single / double / triple / long hold), shown in large text. */
+    @Volatile var gesture = "(no gesture yet)"
+    @Volatile var tapWindowMs = 400
+    @Volatile var holdThresholdMs = 400
+
     const val YTM_PACKAGE = "com.google.android.apps.youtube.music"
 }
