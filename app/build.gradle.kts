@@ -5,7 +5,8 @@ plugins {
     id("org.jetbrains.kotlin.android")
 }
 
-val runNumber = (System.getenv("GITHUB_RUN_NUMBER") ?: "1").toInt()
+// +10: the run counter restarted when the workflow file was renamed; version codes must keep rising.
+val runNumber = (System.getenv("GITHUB_RUN_NUMBER") ?: "1").toInt() + 10
 val gitSha = (System.getenv("GITHUB_SHA") ?: "local").take(7)
 val buildTime = Instant.now().toString()
 
