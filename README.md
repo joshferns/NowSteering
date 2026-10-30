@@ -1,49 +1,45 @@
-# Now Steering — Phase 0 probe
+# Now Steering
 
-Throwaway debug app that answers five questions about a car's Bluetooth stereo
-(character set, field width, refresh behaviour, steering-wheel buttons, and
-coexistence with YouTube Music). No navigation features. No polish.
+Shows Google Maps turn-by-turn prompts, a clock and GPS speed on a car's stock Bluetooth stereo
+screen (2014 Honda City), using the "Now Playing" text fields. Steering-wheel Next / Previous and the
+head-unit Pause button control the music app. Personal use; debug builds only.
 
-**Download (always the newest build):**
-https://github.com/joshferns/NowSteering/releases/latest/download/NowSteering-probe.apk
+**Download (newest builds):**
+- App: https://github.com/joshferns/NowSteering/releases/latest/download/NowSteering.apk
+- Phase 0 probe (for session 2): https://github.com/joshferns/NowSteering/releases/latest/download/NowSteering-probe.apk
 
-Every push that touches the app builds a debug APK in GitHub Actions
-(`.github/workflows/probe-apk.yml`) and publishes it as a new release
-`probe-<n>`, marked latest. All builds use the committed `app/debug.keystore`,
-so a new build installs over the old one without uninstalling (the log survives).
+The two are separate apps (`com.nowsteering.app` and `com.nowsteering.probe`) and can be installed side by side.
+Every build is signed with the committed `app/debug.keystore`, so updates install over the old version.
+GitHub Actions (`.github/workflows/apks.yml`) runs the unit tests, builds both, and publishes them as the latest release.
 
-## One-time phone setup (Samsung S20 FE, Android 13)
-1. Open the link above in Chrome, download, tap the file, allow
-   "Install unknown apps" for Chrome if asked. Play Protect may warn: "Install anyway".
-2. Open **NS Probe**, allow notifications and "Nearby devices" (Bluetooth names).
-3. **Restricted settings (Android 13 sideload rule):** tap *App info (restricted
-   settings)* → ⋮ (top right) → *Allow restricted settings* → confirm.
-   Without this the next step is greyed out.
-4. Tap *Notif listener access* → enable **NS Probe session watcher**.
-5. Tap *Battery: don't optimise* → Allow. Optionally also Settings → Battery →
-   Background usage limits → *Never sleeping apps* → add NS Probe.
+## One-time setup (Now Steering, Android 13)
+In the app, tap the permission buttons in order:
+1. **Allow restricted settings** → ⋮ (top right) → *Allow restricted settings* (needed for sideloaded apps).
+2. **Notification access** → enable *Now Steering (Maps + media)*.
+3. **Notifications, Bluetooth, GPS** → allow all.
+4. **GPS: allow all the time** → choose *Allow all the time* (speed works when started from the car).
+5. **Battery: don't optimise** → Allow (also lets the car connection start the app).
 
-The status lines at the top should then read `listener=true battExempt=true notif=true`.
+Then **Choose car** → pick the car (e.g. "Honda HFT") and leave *Start automatically* ticked.
 
-## What's in the app
-| Section | What it does |
-|---|---|
-| Flash (top, green) | Last raw key (DOWN / UP, repeat count) or transport command, large text, with time |
-| Gesture (blue) | Per key: SINGLE / DOUBLE / TRIPLE tap, LONG HOLD (and tap + hold). Tap window and hold threshold adjustable in section 4b, default 400 ms |
-| 1. Media session | Foreground service with a `MediaSession` and a looping near-silent `AudioTrack` (±1 LSB, inaudible). Start / Stop / Re-grab. "Request audio focus" off = YouTube Music keeps playing |
-| 2. Refresh mode | a) metadata only, b) fake track change (new media ID + duration), c) pause → update → play |
-| 3. Text tester | Title / Artist / Album: preset strings (rulers, arrows, box, blocks, symbols, Devanagari, emoji…) or custom text; send each field or all |
-| 4. Auto counter | Title = `#n HH:mm:ss` every N seconds using the selected refresh mode |
-| 5. Coexistence | Live list of all media sessions in Android's priority order; mirror target (YouTube Music) text into our session; forward next/prev/play/pause to it |
-| 6. Event log | Everything above + Bluetooth connect/disconnect, A2DP state, audio focus, active audio players, permissions. Stored in a file; Share text / Share file / Copy / Clear; *Add note* writes your own marker line |
+## What it does
+- **Car screen.** Nav: `↖ 300 m` / road / `ETA 19:42 6.1km`. Idle: `19:42  48 km/h` / date / `Now Steering`.
+  The display engine (`DisplayEngine`, `Glyphs`) cuts text to 15/18/18 characters, swaps unsupported characters
+  for ASCII, and sends only changed text, at most once per second.
+- **Maps.** `NavListener` reads Google Maps' navigation notification: distance (title), road (text),
+  time · distance · ETA (sub-text). Maps puts the turn arrow only in the notification icon, so each new icon is
+  logged once as ASCII art; labelled icons go in `KnownIcons` (empty until real drives are logged). Until an
+  icon is labelled, the arrow shows `•`.
+- **Buttons.** Next: single = next song, double = switch nav/idle screen (600 ms window, adjustable in Diagnostics).
+  Previous = previous song. Pause (head unit) = pause/resume toggle. Forwarded to the music app that is playing.
+- **Music.** Never takes audio focus, so music keeps playing. Re-claims the car screen on each new nav instruction.
+- **Calls.** On any call (ringing, in call, VoIP; via AudioManager mode) the app stops its audio and
+  deactivates its session at once, and comes back 3 s after the call ends.
+- **Auto-start.** Starts when the chosen car connects over Bluetooth, stops when it disconnects.
+- **Diagnostics.** Gesture readout, what the car is being sent, Maps parse, active media sessions, text tester,
+  event log with Share / Copy / Clear / Add note.
 
-Code: `app/src/main/java/com/nowsteering/probe/` — `ProbeService` (session,
-audio, buttons, refresh modes), `SessionWatcher` (other apps' sessions),
-`ProbeApp` (Bluetooth/audio logging, log header), `MainActivity` (UI),
-`ProbeLog` (persistent log).
+Code: `nowsteering/src/main/java/com/nowsteering/app/` (app), `app/` (probe).
+Build locally: `./gradlew :nowsteering:assembleDebug :nowsteering:testDebugUnitTest`.
 
-## Building locally
-`./gradlew assembleDebug` (JDK 17+, Android SDK 35). Output:
-`app/build/outputs/apk/debug/app-debug.apk`.
-
-The in-car checklist is in [docs/IN_CAR_TEST_SCRIPT.md](docs/IN_CAR_TEST_SCRIPT.md).
+Test scripts: [Phase 1 in-car test](docs/PHASE1_TEST_SCRIPT.md) · [Phase 0 session 2](docs/SESSION2_TEST_SCRIPT.md).
