@@ -167,7 +167,7 @@ class ProbeApp : Application() {
             appendLine("Android ${Build.VERSION.RELEASE} (SDK ${Build.VERSION.SDK_INT}), patch ${Build.VERSION.SECURITY_PATCH}, build ${Build.DISPLAY}, SEM_PLATFORM_INT=$oneUi")
             appendLine("App: ${BuildConfig.VERSION_NAME} code ${BuildConfig.VERSION_CODE} git ${BuildConfig.GIT_SHA} built ${BuildConfig.BUILD_TIME}")
             appendLine("Perms: notif=${notifPermission()} bt=${hasBtPermission()} listener=${listenerEnabled()} batteryExempt=${batteryExempt()}")
-            appendLine("Settings: mode=${ProbeState.mode} focus=${ProbeState.requestAudioFocus} mirror=${ProbeState.mirrorTarget} forward=${ProbeState.forwardToTarget}")
+            appendLine("Settings: mode=${ProbeState.mode} focus=${ProbeState.requestAudioFocus} mirror=${ProbeState.mirrorTarget} forward=${ProbeState.forwardToTarget} tapWindow=${ProbeState.tapWindowMs}ms hold=${ProbeState.holdThresholdMs}ms")
             appendLine("Session running: ${ProbeService.instance != null}")
             appendLine("========================================")
         }

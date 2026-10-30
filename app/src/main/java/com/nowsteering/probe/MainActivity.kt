@@ -32,6 +32,7 @@ class MainActivity : Activity() {
     private val main = Handler(Looper.getMainLooper())
     private lateinit var root: LinearLayout
     private lateinit var flashView: TextView
+    private lateinit var gestureView: TextView
     private lateinit var statusView: TextView
     private lateinit var sessionsView: TextView
     private lateinit var logView: TextView
@@ -129,6 +130,13 @@ class MainActivity : Activity() {
             setBackgroundColor(0x3322AA22)
         }
         root.addView(flashView)
+        gestureView = TextView(this).apply {
+            textSize = 30f
+            setTypeface(Typeface.MONOSPACE, Typeface.BOLD)
+            setPadding(dp(8), dp(8), dp(8), dp(8))
+            setBackgroundColor(0x332255CC)
+        }
+        root.addView(gestureView)
         statusView = TextView(this).apply { textSize = 12f; typeface = Typeface.MONOSPACE }
         root.addView(statusView)
 
@@ -195,6 +203,23 @@ class MainActivity : Activity() {
             service()?.startAuto(n)
         }, button("Stop auto") { service()?.stopAuto() })
 
+        // Gestures
+        section("4b. Gesture timing (blue box above)")
+        note("Taps closer together than the tap window group into double/triple; held longer than the hold threshold = long hold.")
+        val tapMs = EditText(this).apply {
+            setText(ProbeState.tapWindowMs.toString()); inputType = InputType.TYPE_CLASS_NUMBER; hint = "tap ms"
+        }
+        val holdMs = EditText(this).apply {
+            setText(ProbeState.holdThresholdMs.toString()); inputType = InputType.TYPE_CLASS_NUMBER; hint = "hold ms"
+        }
+        row(TextView(this).apply { text = "tap window ms" }, tapMs, TextView(this).apply { text = "hold ms" }, holdMs)
+        row(button("Apply timings") {
+            ProbeState.tapWindowMs = tapMs.text.toString().toIntOrNull()?.coerceIn(100, 3000) ?: 400
+            ProbeState.holdThresholdMs = holdMs.text.toString().toIntOrNull()?.coerceIn(100, 5000) ?: 400
+            tapMs.setText(ProbeState.tapWindowMs.toString()); holdMs.setText(ProbeState.holdThresholdMs.toString())
+            ProbeLog.log("UI", "gesture timings: tap window ${ProbeState.tapWindowMs}ms, hold ${ProbeState.holdThresholdMs}ms")
+        })
+
         // Coexistence
         section("5. Coexistence with YouTube Music")
         check("Mirror target's title/artist/album into our session", ProbeState.mirrorTarget) {
@@ -256,6 +281,7 @@ class MainActivity : Activity() {
 
     private fun renderFlash() {
         flashView.text = ProbeState.flash
+        gestureView.text = ProbeState.gesture
     }
 
     private fun renderStatus() {
