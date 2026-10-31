@@ -1,4 +1,4 @@
-# Phase 1 test 2 (~8 min: parked, then a short loop)
+# Phase 1 test 2 (~10 min: parked, then a short loop)
 
 **At home first:** install the new NowSteering.apk. Open it: the box at the top must say **Setup complete**.
 For any MISSING line, tap its numbered button. For *Notification access*: tap **1. Allow restricted settings** → ⋮
@@ -15,15 +15,24 @@ For any MISSING line, tap its numbered button. For *Notification access*: tap **
 7. Lock the phone. Watch 20 s. Note: ticking / frozen? Any flicker or odd display?
 8. Unlock. Choose the style that kept ticking (if several did, use **metadata only** first, then **bump**). Untick **Seconds on idle clock**.
 
+## Wheel buttons → YouTube Music
+9. Start YouTube Music playing.
+10. Press steering **Next** once. Note: did the song change (after ~0.6 s)?
+11. Press steering **Previous** once. Note: did the song change back / restart?
+12. Press head-unit **Pause**. Note: did the music pause?
+13. Press head-unit **Pause** again. Note: did it resume?
+    (If the car shows "No music link", notification access is still off.)
+
 ## Nav check
-9. Start Google Maps navigation to a place ~2 km away. Note: car shows `• <distance>` / road / `ETA …`? 📷
-10. Lock the phone and drive there (glance only). Note: does the distance count down? Do road changes show?
-11. Arrive. Note: does the car go back to the clock screen?
-12. Diagnostics → **Share file**, send it to me with your notes.
+14. Start Google Maps navigation to a place ~2 km away. Note: car shows `• <distance>` / road / `ETA …`? 📷
+15. Lock the phone and drive there (glance only). Note: does the distance count down? Do road changes show?
+16. Arrive. Note: does the car go back to the clock screen?
+17. Diagnostics → **Share file**, send it to me with your notes.
 
 **Notes template**
 ```
 1: …  2: …  3 (metadata only): …  5 (bump): …  7 (track change): …  8 chose: …
-9: …  10: …  11: …
+10 next: …  11 prev: …  12 pause: …  13 resume: …
+14: …  15: …  16: …
 odd: …
 ```

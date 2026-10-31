@@ -82,6 +82,8 @@ class SteeringService : Service() {
     var mode = Mode.AUTO
         private set
     private var testScreen: Screen? = null
+    private var notice: Screen? = null
+    private var noticeUntil = 0L
 
     private var speedKmh: Int? = null
     private var speedAt = 0L
@@ -313,9 +315,17 @@ class SteeringService : Service() {
         refreshScreen()
     }
 
+    /** Show a short message on the car for [ms], then go back to the live screen. */
+    private fun showNotice(s: Screen, ms: Long = 3000) {
+        notice = s
+        noticeUntil = SystemClock.elapsedRealtime() + ms
+        refreshScreen()
+    }
+
     private fun refreshScreen(force: Boolean = false) {
         val nav = NavState.info
         val s = when {
+            notice != null && SystemClock.elapsedRealtime() < noticeUntil -> notice!!
             mode == Mode.TEST -> testScreen ?: idleScreen()
             nav != null && mode == Mode.AUTO -> navScreen(nav)
             else -> idleScreen()
@@ -385,9 +395,13 @@ class SteeringService : Service() {
     // ---- Buttons -> music app ----
 
     private fun forward(what: String, action: (MediaController.TransportControls) -> Unit) {
+        NsApp.watcher.refresh() // the session list can be stale
         val t = NsApp.watcher.target()
         if (t == null) {
-            NsLog.log("FWD", "$what: no music app session to forward to")
+            val access = NsApp.instance.listenerEnabled()
+            NsLog.log("FWD", "$what: no music app session to forward to (notification access=$access)")
+            // Tell the driver on the car screen why the button did nothing.
+            showNotice(if (access) Screen("No music app", "Start music first", "") else Screen("No music link", "Grant notif access", "in Now Steering app"))
             return
         }
         val before = "${SessionWatcher.stateName(t.playbackState?.state)} ${SessionWatcher.describe(t.metadata)}"

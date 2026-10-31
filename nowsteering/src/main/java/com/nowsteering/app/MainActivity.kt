@@ -84,7 +84,7 @@ class MainActivity : BaseActivity() {
     private fun render() {
         val app = NsApp.instance
         val checks = listOf(
-            "Notification access (step 2)" to app.listenerEnabled(),
+            "Notification access: nav + wheel buttons (step 2)" to app.listenerEnabled(),
             "Car chosen" to (Prefs.carAddress != null),
             "Battery not optimised (step 5)" to app.batteryExempt(),
             "GPS all the time (step 4)" to app.granted(Manifest.permission.ACCESS_BACKGROUND_LOCATION),
