@@ -43,3 +43,9 @@ Code: `nowsteering/src/main/java/com/nowsteering/app/` (app), `app/` (probe).
 Build locally: `./gradlew :nowsteering:assembleDebug :nowsteering:testDebugUnitTest`.
 
 Test scripts: [Phase 1 in-car test](docs/PHASE1_TEST_SCRIPT.md) · [Phase 0 session 2](docs/SESSION2_TEST_SCRIPT.md).
+
+## Known car behaviour (not app bugs)
+- Using the microphone while connected (e.g. voice dictation in another app) makes the Honda show its
+  call screen, which can look stuck. It isn't caused by Now Steering.
+- Each sideloaded app needs *Allow restricted settings* before its notification access can be turned on.
+  The main screen's checklist shows anything missing.

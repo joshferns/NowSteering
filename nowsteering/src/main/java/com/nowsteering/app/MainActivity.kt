@@ -15,6 +15,7 @@ import android.widget.TextView
 /** Settings: pick the car, auto-start on/off, permissions, manual start/stop. */
 class MainActivity : BaseActivity() {
     private val main = Handler(Looper.getMainLooper())
+    private lateinit var checklist: TextView
     private lateinit var status: TextView
     private lateinit var carView: TextView
 
@@ -26,6 +27,7 @@ class MainActivity : BaseActivity() {
         super.onCreate(savedInstanceState)
         page()
         section("Now Steering")
+        checklist = big(0).apply { textSize = 17f }
         status = mono(13f)
 
         section("Car")
@@ -80,6 +82,18 @@ class MainActivity : BaseActivity() {
     }
 
     private fun render() {
+        val app = NsApp.instance
+        val checks = listOf(
+            "Notification access (step 2)" to app.listenerEnabled(),
+            "Car chosen" to (Prefs.carAddress != null),
+            "Battery not optimised (step 5)" to app.batteryExempt(),
+            "GPS all the time (step 4)" to app.granted(Manifest.permission.ACCESS_BACKGROUND_LOCATION),
+            "Notifications + Bluetooth (step 3)" to (app.granted(Manifest.permission.POST_NOTIFICATIONS) && app.granted(Manifest.permission.BLUETOOTH_CONNECT)),
+        )
+        val missing = checks.count { !it.second }
+        checklist.text = (if (missing == 0) "Setup complete\n" else "SETUP INCOMPLETE: $missing missing\n") +
+            checks.joinToString("\n") { (name, ok) -> (if (ok) "OK   " else "MISSING  ") + name }
+        checklist.setBackgroundColor(if (missing == 0) 0x3322AA22 else 0x55DD2222)
         val s = SteeringService.instance
         status.text = buildString {
             append("Service: ").append(if (s == null) "OFF" else if (s.steppedAside) "ON (stepped aside: call)" else "ON").append('\n')
