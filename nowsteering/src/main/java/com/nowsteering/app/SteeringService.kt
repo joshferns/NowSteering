@@ -62,6 +62,13 @@ class SteeringService : Service() {
 
     enum class Mode { AUTO, IDLE_WHILE_NAV, TEST }
 
+    /** How each text change reaches the car. METADATA_ONLY was proven parked with the phone unlocked. */
+    enum class RefreshStyle(val label: String) {
+        METADATA_ONLY("metadata only"),
+        STATE_BUMP("metadata + playback-position bump"),
+        TRACK_CHANGE("fake track change (new id each update)"),
+    }
+
     private val main = Handler(Looper.getMainLooper())
     private lateinit var audio: AudioManager
     private lateinit var session: MediaSession
@@ -79,6 +86,9 @@ class SteeringService : Service() {
     private var speedKmh: Int? = null
     private var speedAt = 0L
     private var locationOn = false
+    private var wakeLock: android.os.PowerManager.WakeLock? = null
+    private var sendCount = 0L
+    private val startedAt = SystemClock.elapsedRealtime()
 
     val currentScreen get() = engine.current
     val gesture get() = buttons.lastGesture
@@ -102,7 +112,17 @@ class SteeringService : Service() {
         callGuard = CallGuard(audio, ::stepAside, ::comeBack)
         NavState.listener = { info -> main.post { onNav(info) } }
         startLocation()
-        NsLog.log("SERVICE", "started")
+        // Keep the CPU running with the screen off; only held while the car is connected.
+        wakeLock = getSystemService(android.os.PowerManager::class.java)
+            .newWakeLock(android.os.PowerManager.PARTIAL_WAKE_LOCK, "NowSteering:car").apply { acquire() }
+        registerReceiver(screenReceiver, android.content.IntentFilter().apply {
+            addAction(Intent.ACTION_SCREEN_ON)
+            addAction(Intent.ACTION_SCREEN_OFF)
+            addAction(Intent.ACTION_USER_PRESENT)
+            addAction(android.bluetooth.BluetoothA2dp.ACTION_PLAYING_STATE_CHANGED)
+        }, Context.RECEIVER_EXPORTED)
+        NsLog.log("SERVICE", "started; ${NsApp.instance.permSummary()} refresh=${Prefs.refreshStyle}")
+        if (!NsApp.instance.listenerEnabled()) NsLog.log("SERVICE", "WARNING: notification access is OFF: no nav, no music control")
         callGuard.start() // steps aside straight away if a call is already on
         if (!callGuard.inCall) comeBack()
         main.post(ticker)
@@ -112,6 +132,8 @@ class SteeringService : Service() {
 
     override fun onDestroy() {
         main.removeCallbacks(ticker)
+        unregisterReceiver(screenReceiver)
+        wakeLock?.let { if (it.isHeld) it.release() }
         buttons.cancel()
         callGuard.stop()
         NavState.listener = null
@@ -181,17 +203,41 @@ class SteeringService : Service() {
             .build())
     }
 
+    private val screenReceiver = object : android.content.BroadcastReceiver() {
+        override fun onReceive(c: Context, i: Intent) {
+            when (i.action) {
+                Intent.ACTION_SCREEN_ON -> NsLog.log("PHONE", "screen on")
+                Intent.ACTION_SCREEN_OFF -> NsLog.log("PHONE", "screen off")
+                Intent.ACTION_USER_PRESENT -> NsLog.log("PHONE", "unlocked")
+                android.bluetooth.BluetoothA2dp.ACTION_PLAYING_STATE_CHANGED -> {
+                    val st = i.getIntExtra(android.bluetooth.BluetoothProfile.EXTRA_STATE, -1)
+                    NsLog.log("BT", "A2DP audio stream " + if (st == android.bluetooth.BluetoothA2dp.STATE_PLAYING) "PLAYING" else "NOT_PLAYING ($st)")
+                }
+            }
+        }
+    }
+
     private fun sendToCar(s: Screen) {
-        // Metadata-only update: fixed media id and duration, so the car just refreshes the text.
+        sendCount++
+        val style = runCatching { RefreshStyle.valueOf(Prefs.refreshStyle) }.getOrDefault(RefreshStyle.METADATA_ONLY)
+        val id = if (style == RefreshStyle.TRACK_CHANGE) "ns-$sendCount" else "ns"
         session.setMetadata(MediaMetadata.Builder()
-            .putString(MediaMetadata.METADATA_KEY_MEDIA_ID, "ns")
+            .putString(MediaMetadata.METADATA_KEY_MEDIA_ID, id)
             .putString(MediaMetadata.METADATA_KEY_TITLE, s.title)
             .putString(MediaMetadata.METADATA_KEY_ARTIST, s.artist)
             .putString(MediaMetadata.METADATA_KEY_ALBUM, s.album)
             .putLong(MediaMetadata.METADATA_KEY_DURATION, 3_600_000)
             .putLong(MediaMetadata.METADATA_KEY_TRACK_NUMBER, 1)
             .build())
-        NsLog.log("SCREEN", "sent $s")
+        when (style) {
+            RefreshStyle.METADATA_ONLY -> {}
+            RefreshStyle.STATE_BUMP -> session.setPlaybackState(PlaybackState.Builder()
+                .setActions(ACTIONS)
+                .setState(PlaybackState.STATE_PLAYING, SystemClock.elapsedRealtime() - startedAt, 1f)
+                .build())
+            RefreshStyle.TRACK_CHANGE -> setPlaying() // position back to 0 for the "new track"
+        }
+        NsLog.log("SCREEN", "sent $s${if (style != RefreshStyle.METADATA_ONLY) " [${style.name}]" else ""}")
     }
 
     /** Restart our silent track so Android ranks our session on top again. */
@@ -287,12 +333,15 @@ class SteeringService : Service() {
 
     private val clockFmt = SimpleDateFormat("HH:mm", Locale.US)
     private val dateFmt = SimpleDateFormat("EEE d MMM", Locale.US)
+    private val secFmt = SimpleDateFormat("HH:mm:ss", Locale.US)
 
     private fun idleScreen(): Screen {
         val now = Date()
         val fresh = speedKmh != null && SystemClock.elapsedRealtime() - speedAt < 5000
-        val speed = if (fresh) "${speedKmh} km/h" else "-- km/h"
-        return Screen("${clockFmt.format(now)}  $speed", dateFmt.format(now), "Now Steering")
+        val speed = if (fresh) "$speedKmh" else "--"
+        // With seconds (lock-screen refresh test) the title is 15 chars: "08:41:23 35km/h".
+        val title = if (Prefs.idleSeconds) "${secFmt.format(now)} ${speed}km/h" else "${clockFmt.format(now)}  $speed km/h"
+        return Screen(title, dateFmt.format(now), "Now Steering")
     }
 
     private val ticker = object : Runnable {

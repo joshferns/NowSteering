@@ -46,6 +46,25 @@ class DiagnosticsActivity : BaseActivity() {
         }, button("Back to live") { SteeringService.instance?.backToLive() },
             button("Re-grab") { SteeringService.instance?.regrab("Diagnostics button", force = true) })
 
+        section("Car refresh (phone-locked test)")
+        root.addView(android.widget.CheckBox(this).apply {
+            text = "Seconds on idle clock"
+            isChecked = Prefs.idleSeconds
+            setOnCheckedChangeListener { _, b -> Prefs.idleSeconds = b; NsLog.log("UI", "idle seconds = $b") }
+        })
+        val styles = android.widget.RadioGroup(this)
+        SteeringService.RefreshStyle.entries.forEach { st ->
+            styles.addView(android.widget.RadioButton(this).apply {
+                id = View.generateViewId()
+                text = st.label
+                isChecked = st.name == Prefs.refreshStyle
+                setOnCheckedChangeListener { _, b ->
+                    if (b) { Prefs.refreshStyle = st.name; NsLog.log("UI", "refresh style = ${st.name}") }
+                }
+            })
+        }
+        root.addView(styles)
+
         section("Buttons")
         val tap = EditText(this).apply { setText(Prefs.tapWindowMs.toString()); inputType = InputType.TYPE_CLASS_NUMBER }
         row(TextView(this).apply { text = "Next tap window ms" }, tap, button("Apply") {

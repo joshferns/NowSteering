@@ -16,6 +16,7 @@ class SessionWatcher(private val ctx: Context) {
     private val component = ComponentName(ctx, NavListener::class.java)
     private val main = Handler(Looper.getMainLooper())
     private var started = false
+    private var deniedLogged = false
     private var lastOrder = ""
     private var lastPlayingPackage: String? = null
 
@@ -34,7 +35,8 @@ class SessionWatcher(private val ctx: Context) {
             NsLog.log("SESSIONS", "watching active media sessions")
             update(msm.getActiveSessions(component))
         } catch (e: SecurityException) {
-            NsLog.log("SESSIONS", "cannot list sessions: notification-listener access not granted")
+            if (!deniedLogged) NsLog.log("SESSIONS", "cannot list sessions: notification-listener access not granted")
+            deniedLogged = true
         }
     }
 
