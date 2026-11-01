@@ -100,6 +100,7 @@ class SteeringService : Service() {
     private var drBaseAt = 0L
     private var drTravelled = 0.0
     private var lastNav: NavState.Info? = null
+    private var tripMeters: Double? = null // longest distance-left seen this trip, for the trip bar
     private var locationOn = false
     private var wakeLock: android.os.PowerManager.WakeLock? = null
     private var sendCount = 0L
@@ -126,6 +127,7 @@ class SteeringService : Service() {
         startForegroundNow()
         callGuard = CallGuard(audio, ::stepAside, ::comeBack)
         NavState.listener = { info -> main.post { onNav(info) } }
+        NsApp.watcher.onSongChange = { pkg -> reclaimSoon("song change in ${SessionWatcher.short(pkg)}") }
         startLocation()
         // Keep the CPU running with the screen off; only held while the car is connected.
         wakeLock = getSystemService(android.os.PowerManager::class.java)
@@ -154,6 +156,8 @@ class SteeringService : Service() {
         buttons.cancel()
         callGuard.stop()
         NavState.listener = null
+        NsApp.watcher.onSongChange = null
+        main.removeCallbacks(reclaim)
         stopLocation()
         stopSilence()
         session.isActive = false
@@ -265,6 +269,23 @@ class SteeringService : Service() {
         NsLog.log("SCREEN", "sent $s${if (style != RefreshStyle.METADATA_ONLY) " [${style.name}]" else ""}")
     }
 
+    private var reclaimWhy = ""
+    private val reclaim = Runnable {
+        if (NavState.active) regrab(reclaimWhy, force = true)
+        else NsLog.log("SESSION", "no re-claim after $reclaimWhy: not navigating, music info stays on the car")
+    }
+
+    /** While navigating, take the car screen back ~1.5 s after the music app changes song. */
+    private fun reclaimSoon(why: String) {
+        if (!NavState.active) {
+            NsLog.log("SESSION", "no re-claim after $why: not navigating, music info stays on the car")
+            return
+        }
+        reclaimWhy = why
+        main.removeCallbacks(reclaim) // music apps send several updates per song change: one re-claim
+        main.postDelayed(reclaim, 1500)
+    }
+
     /** Restart our silent track so Android ranks our session on top again. */
     fun regrab(why: String, force: Boolean = false) {
         if (callGuard.inCall) return
@@ -304,6 +325,7 @@ class SteeringService : Service() {
         if (info == null) {
             lastInstruction = null
             drBaseMeters = null
+            tripMeters = null
             if (mode == Mode.IDLE_WHILE_NAV) mode = Mode.AUTO
             val last = lastNav
             lastNav = null
@@ -320,6 +342,7 @@ class SteeringService : Service() {
             return
         }
         lastNav = info
+        NavTextParser.metersOf(info.text.remaining)?.let { m -> tripMeters = maxOf(tripMeters ?: 0.0, m) }
         notice = null // a new trip replaces any "Arrived" message
         clearArrived("new navigation")
         updateDeadReckoning(info)
@@ -391,6 +414,12 @@ class SteeringService : Service() {
         val meters = NavTextParser.metersOf(i.text.distance)
         if (i.instructionId == drInstruction && i.text.distance == drDistanceText) return
         val est = estimatedMeters()
+        if (est != null && i.instructionId == drInstruction && meters != null && meters > est && meters - est < 30) {
+            // Maps is a little behind our estimate: keep counting down instead of jumping back up.
+            NsLog.log("DR", "Maps ${i.text.distance}, estimate ${NavTextParser.formatMeters(est)}: ignored upward correction of ${(meters - est).roundToInt()} m")
+            drDistanceText = i.text.distance
+            return
+        }
         if (est != null && i.instructionId == drInstruction && meters != null) {
             NsLog.log("DR", "Maps ${i.text.distance}, estimate was ${NavTextParser.formatMeters(est)} " +
                 "(error ${(est - meters).roundToInt()} m after ${(SystemClock.elapsedRealtime() - drBaseAt) / 1000} s)")
@@ -413,8 +442,15 @@ class SteeringService : Service() {
         val t = i.text
         val distance = estimatedMeters()?.let { NavTextParser.formatMeters(it) } ?: t.distance
         val title = "${i.glyph} $distance".trim()
-        val album = listOfNotNull(t.eta.takeIf { it.isNotEmpty() }?.let { "ETA $it" }, t.remaining.replace(" ", "").takeIf { it.isNotEmpty() })
-            .joinToString(" ")
+        val toTurn = estimatedMeters() ?: NavTextParser.metersOf(t.distance)
+        val turnBar = if (Prefs.turnBar) Bars.turnBar(toTurn) else null
+        val tripBar = if (Prefs.tripBar) Bars.tripBar(NavTextParser.metersOf(t.remaining), tripMeters) else null
+        val eta = t.eta.takeIf { it.isNotEmpty() }?.let { "ETA $it" }
+        val album = when {
+            turnBar != null -> turnBar // last 300 m before the turn
+            tripBar != null && eta != null -> "$eta $tripBar"
+            else -> listOfNotNull(eta, t.remaining.replace(" ", "").takeIf { it.isNotEmpty() }).joinToString(" ")
+        }
         return Screen(title, t.road, album)
     }
 
@@ -499,6 +535,7 @@ class SteeringService : Service() {
         val before = "${SessionWatcher.stateName(t.playbackState?.state)} ${SessionWatcher.describe(t.metadata)}"
         action(t.transportControls)
         NsLog.log("FWD", "$what -> ${t.packageName} (before: $before)")
+        if (what == "next" || what == "previous") reclaimSoon("forwarded $what")
         // Check a moment later whether the music app actually reacted.
         main.postDelayed({
             NsLog.log("FWD", "$what check: ${t.packageName} now ${SessionWatcher.stateName(t.playbackState?.state)} ${SessionWatcher.describe(t.metadata)}")

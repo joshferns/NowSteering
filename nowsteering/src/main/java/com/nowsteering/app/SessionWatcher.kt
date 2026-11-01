@@ -24,6 +24,10 @@ class SessionWatcher(private val ctx: Context) {
         private set
     private val callbacks = HashMap<MediaSession.Token, MediaController.Callback>()
     private val lastState = HashMap<MediaSession.Token, Int>()
+    private val lastTitle = HashMap<MediaSession.Token, String?>()
+
+    /** A music app changed song (it may have taken the car screen). */
+    var onSongChange: ((String) -> Unit)? = null
 
     private val changed = MediaSessionManager.OnActiveSessionsChangedListener { list -> update(list ?: emptyList()) }
 
@@ -51,7 +55,7 @@ class SessionWatcher(private val ctx: Context) {
         val tokens = list.map { it.sessionToken }.toSet()
         callbacks.keys.filter { it !in tokens }.forEach { t ->
             controllers.firstOrNull { it.sessionToken == t }?.unregisterCallback(callbacks[t]!!)
-            callbacks.remove(t); lastState.remove(t)
+            callbacks.remove(t); lastState.remove(t); lastTitle.remove(t)
         }
         for (c in list) {
             if (c.sessionToken in callbacks) continue
@@ -59,6 +63,7 @@ class SessionWatcher(private val ctx: Context) {
             c.registerCallback(cb, main)
             callbacks[c.sessionToken] = cb
             lastState[c.sessionToken] = c.playbackState?.state ?: -1
+            lastTitle[c.sessionToken] = c.metadata?.getString(MediaMetadata.METADATA_KEY_TITLE)
             if (isMusic(c) && c.playbackState?.state == PlaybackState.STATE_PLAYING) lastPlayingPackage = c.packageName
         }
         controllers = list
@@ -82,6 +87,12 @@ class SessionWatcher(private val ctx: Context) {
         override fun onMetadataChanged(md: MediaMetadata?) {
             if (!isMusic(c)) return
             NsLog.log("SESSIONS", "${short(c.packageName)} metadata: ${describe(md)}")
+            // Music apps resend the same metadata several times; only a new title is a song change.
+            val title = md?.getString(MediaMetadata.METADATA_KEY_TITLE)
+            if (!title.isNullOrEmpty() && lastTitle.containsKey(c.sessionToken) && lastTitle[c.sessionToken] != title) {
+                onSongChange?.invoke(c.packageName)
+            }
+            if (!title.isNullOrEmpty()) lastTitle[c.sessionToken] = title
         }
 
         override fun onSessionDestroyed() {
