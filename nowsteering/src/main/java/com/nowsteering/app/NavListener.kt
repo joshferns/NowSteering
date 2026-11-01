@@ -86,7 +86,8 @@ class NavListener : NotificationListenerService() {
             parsed.textGlyph != null -> parsed.textGlyph to "text"
             else -> "•" to "unknown"
         }
-        NavState.update(sbn.key, NavState.Info(parsed, glyph, source, hex), real = !heading)
+        NavState.update(sbn.key, NavState.Info(parsed, glyph, source, hex),
+            real = !heading && parsed.distance.isNotEmpty()) // "Starting navigation…" is not a real instruction yet
     }
 
     /** Log each new icon shape once (as ASCII art + hex) so it can be labelled in [KnownIcons]. */
