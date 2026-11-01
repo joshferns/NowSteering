@@ -86,7 +86,18 @@ class SteeringService : Service() {
     private var noticeUntil = 0L
 
     private var speedKmh: Int? = null
+    private var speedMps = 0f
     private var speedAt = 0L
+    private var gpsStale = true
+
+    // Dead reckoning: with the phone locked Maps only updates every 10-25 s, so between its
+    // updates we count the turn distance down using our own GPS speed.
+    private var drInstruction: String? = null
+    private var drDistanceText: String? = null
+    private var drBaseMeters: Double? = null
+    private var drBaseAt = 0L
+    private var drTravelled = 0.0
+    private var lastNav: NavState.Info? = null
     private var locationOn = false
     private var wakeLock: android.os.PowerManager.WakeLock? = null
     private var sendCount = 0L
@@ -122,7 +133,9 @@ class SteeringService : Service() {
             addAction(Intent.ACTION_SCREEN_OFF)
             addAction(Intent.ACTION_USER_PRESENT)
             addAction(android.bluetooth.BluetoothA2dp.ACTION_PLAYING_STATE_CHANGED)
+            addAction(android.os.PowerManager.ACTION_POWER_SAVE_MODE_CHANGED)
         }, Context.RECEIVER_EXPORTED)
+        logPowerSave("at start")
         NsLog.log("SERVICE", "started; ${NsApp.instance.permSummary()} refresh=${Prefs.refreshStyle}")
         if (!NsApp.instance.listenerEnabled()) NsLog.log("SERVICE", "WARNING: notification access is OFF: no nav, no music control")
         callGuard.start() // steps aside straight away if a call is already on
@@ -211,12 +224,19 @@ class SteeringService : Service() {
                 Intent.ACTION_SCREEN_ON -> NsLog.log("PHONE", "screen on")
                 Intent.ACTION_SCREEN_OFF -> NsLog.log("PHONE", "screen off")
                 Intent.ACTION_USER_PRESENT -> NsLog.log("PHONE", "unlocked")
+                android.os.PowerManager.ACTION_POWER_SAVE_MODE_CHANGED -> logPowerSave("changed")
                 android.bluetooth.BluetoothA2dp.ACTION_PLAYING_STATE_CHANGED -> {
                     val st = i.getIntExtra(android.bluetooth.BluetoothProfile.EXTRA_STATE, -1)
                     NsLog.log("BT", "A2DP audio stream " + if (st == android.bluetooth.BluetoothA2dp.STATE_PLAYING) "PLAYING" else "NOT_PLAYING ($st)")
                 }
             }
         }
+    }
+
+    private fun logPowerSave(why: String) {
+        val pm = getSystemService(android.os.PowerManager::class.java)
+        // locationPowerSaveMode: 0 no change, 1 GPS off when screen off, 2 all location off when screen off, 3 foreground only, 4 throttled when screen off
+        NsLog.log("PHONE", "power saving $why: on=${pm.isPowerSaveMode} locationMode=${pm.locationPowerSaveMode}")
     }
 
     private fun sendToCar(s: Screen) {
@@ -280,9 +300,25 @@ class SteeringService : Service() {
     private fun onNav(info: NavState.Info?) {
         if (info == null) {
             lastInstruction = null
+            drBaseMeters = null
             if (mode == Mode.IDLE_WHILE_NAV) mode = Mode.AUTO
-            NsLog.log("SCREEN", "nav ended: idle screen")
-        } else if (info.instructionId != lastInstruction) {
+            val last = lastNav
+            lastNav = null
+            val left = last?.text?.remaining?.let { NavTextParser.metersOf(it) }
+            if (left != null && left <= 150) {
+                // Maps ends navigation by itself on arrival: say so instead of jumping straight to the clock.
+                NsLog.log("SCREEN", "nav ended on arrival (${last.text.remaining} left): arrived screen for 10 s")
+                showNotice(Screen("● Arrived", last.text.road, clockFmt.format(Date())), 10_000)
+            } else {
+                NsLog.log("SCREEN", "nav ended before arrival (${last?.text?.remaining ?: "?"} left): idle screen")
+                showNotice(Screen("Nav ended", "", ""), 4000)
+            }
+            return
+        }
+        lastNav = info
+        notice = null // a new trip replaces any "Arrived" message
+        updateDeadReckoning(info)
+        if (info.instructionId != lastInstruction) {
             val first = lastInstruction == null
             lastInstruction = info.instructionId
             regrab(if (first) "navigation started" else "new instruction", force = first)
@@ -333,9 +369,33 @@ class SteeringService : Service() {
         engine.show(s, force)
     }
 
+    /** Re-base the estimate whenever Maps gives a new instruction or a new distance; a repeated (stale) distance is ignored. */
+    private fun updateDeadReckoning(i: NavState.Info) {
+        val meters = NavTextParser.metersOf(i.text.distance)
+        if (i.instructionId == drInstruction && i.text.distance == drDistanceText) return
+        val est = estimatedMeters()
+        if (est != null && i.instructionId == drInstruction && meters != null) {
+            NsLog.log("DR", "Maps ${i.text.distance}, estimate was ${NavTextParser.formatMeters(est)} " +
+                "(error ${(est - meters).roundToInt()} m after ${(SystemClock.elapsedRealtime() - drBaseAt) / 1000} s)")
+        }
+        drInstruction = i.instructionId
+        drDistanceText = i.text.distance
+        drBaseMeters = meters
+        drBaseAt = SystemClock.elapsedRealtime()
+        drTravelled = 0.0
+    }
+
+    /** Distance to the turn counted down from Maps' last value, or null when not estimating. */
+    private fun estimatedMeters(): Double? {
+        val base = drBaseMeters ?: return null
+        if (drTravelled < 1 || SystemClock.elapsedRealtime() - drBaseAt > 90_000) return null
+        return (base - drTravelled).coerceAtLeast(0.0)
+    }
+
     private fun navScreen(i: NavState.Info): Screen {
         val t = i.text
-        val title = "${i.glyph} ${t.distance}".trim()
+        val distance = estimatedMeters()?.let { NavTextParser.formatMeters(it) } ?: t.distance
+        val title = "${i.glyph} $distance".trim()
         val album = listOfNotNull(t.eta.takeIf { it.isNotEmpty() }?.let { "ETA $it" }, t.remaining.replace(" ", "").takeIf { it.isNotEmpty() })
             .joinToString(" ")
         return Screen(title, t.road, album)
@@ -356,6 +416,7 @@ class SteeringService : Service() {
 
     private val ticker = object : Runnable {
         override fun run() {
+            checkGpsStale()
             refreshScreen() // engine skips it unless the text changed
             main.postDelayed(this, 1000)
         }
@@ -365,9 +426,22 @@ class SteeringService : Service() {
 
     private val locListener = LocationListener { loc: Location ->
         if (loc.hasSpeed()) {
+            val now = SystemClock.elapsedRealtime()
+            // Only count distance between fixes that are close together (GPS gaps are not guessed over).
+            if (drBaseMeters != null && now - speedAt <= 3000) drTravelled += speedMps * (now - speedAt) / 1000.0
+            speedMps = loc.speed
             val k = (loc.speed * 3.6f).roundToInt()
             speedKmh = if (k < 2) 0 else k
-            speedAt = SystemClock.elapsedRealtime()
+            speedAt = now
+            if (gpsStale) { gpsStale = false; NsLog.log("GPS", "fixes coming in") }
+        }
+    }
+
+    private fun checkGpsStale() {
+        if (!gpsStale && SystemClock.elapsedRealtime() - speedAt > 5000) {
+            gpsStale = true
+            val pm = getSystemService(android.os.PowerManager::class.java)
+            NsLog.log("GPS", "no fix for 5 s (powerSave=${pm.isPowerSaveMode} locationPowerSaveMode=${pm.locationPowerSaveMode})")
         }
     }
 

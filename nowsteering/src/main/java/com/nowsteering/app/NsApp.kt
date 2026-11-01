@@ -55,10 +55,13 @@ class NsApp : Application() {
     fun listenerEnabled() =
         Settings.Secure.getString(contentResolver, "enabled_notification_listeners")?.contains(packageName) == true
 
+    /** Power saving (Battery saver) can turn GPS off while the screen is off. */
+    fun powerSaveOn() = getSystemService(PowerManager::class.java).isPowerSaveMode
+
     fun batteryExempt() = getSystemService(PowerManager::class.java).isIgnoringBatteryOptimizations(packageName)
 
     fun permSummary() = "listener=${listenerEnabled()} battery=${batteryExempt()} " +
-        "notif=${granted(Manifest.permission.POST_NOTIFICATIONS)} bt=${granted(Manifest.permission.BLUETOOTH_CONNECT)} " +
+        "powerSave=${powerSaveOn()} notif=${granted(Manifest.permission.POST_NOTIFICATIONS)} bt=${granted(Manifest.permission.BLUETOOTH_CONNECT)} " +
         "gps=${granted(Manifest.permission.ACCESS_FINE_LOCATION)} gpsBackground=${granted(Manifest.permission.ACCESS_BACKGROUND_LOCATION)}"
 
     fun header() = buildString {

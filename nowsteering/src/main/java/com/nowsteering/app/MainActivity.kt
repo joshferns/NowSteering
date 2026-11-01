@@ -87,6 +87,7 @@ class MainActivity : BaseActivity() {
             "Notification access: nav + wheel buttons (step 2)" to app.listenerEnabled(),
             "Car chosen" to (Prefs.carAddress != null),
             "Battery not optimised (step 5)" to app.batteryExempt(),
+            "Power saving OFF (it stops GPS when locked)" to !app.powerSaveOn(),
             "GPS all the time (step 4)" to app.granted(Manifest.permission.ACCESS_BACKGROUND_LOCATION),
             "Notifications + Bluetooth (step 3)" to (app.granted(Manifest.permission.POST_NOTIFICATIONS) && app.granted(Manifest.permission.BLUETOOTH_CONNECT)),
         )
