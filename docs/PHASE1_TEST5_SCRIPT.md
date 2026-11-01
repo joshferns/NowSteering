@@ -1,7 +1,7 @@
 # Phase 1 test 5: build 0.2.18 (~4 min parked + one normal navigated drive)
 
-**At home:** install NowSteering.apk and check the main screen shows **0.2.18** in Diagnostics' log header
-(or Settings → Apps → Now Steering → version). Diagnostics → **Clear**.
+**At home:** install NowSteering.apk and check the version is **0.2.18**
+(Settings → Apps → Now Steering). Diagnostics → **Clear**.
 
 ## Parked: bar width test (one action per step)
 1. Start the car; wait for "Now Steering is on".
