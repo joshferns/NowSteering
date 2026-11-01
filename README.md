@@ -32,7 +32,11 @@ Then **Choose car** → pick the car (e.g. "Honda HFT") and leave *Start automat
   icon is labelled, the arrow shows `•`.
 - **Buttons.** Next: single = next song, double = switch nav/idle screen (600 ms window, adjustable in Diagnostics).
   Previous = previous song. Pause (head unit) = pause/resume toggle. Forwarded to the music app that is playing.
-- **Music.** Never takes audio focus, so music keeps playing. Re-claims the car screen on each new nav instruction.
+- **Music.** Never takes audio focus, so music keeps playing. While navigating, re-claims the car screen on each
+  new instruction and ~1.5 s after a song change or skip; when not navigating, the music app's song info shows.
+- **Progress bars** (settings, both on): turn bar `█████▒▒▒▒▒` replaces the ETA line in the last 300 m before a turn;
+  trip bar `ETA 09:45 ███▒▒` shows overall trip progress.
+- **Arrival.** `● Arrived` stays until the car moves (> 10 km/h), a new trip starts, double Next, or the car disconnects.
 - **Calls.** On any call (ringing, in call, VoIP; via AudioManager mode) the app stops its audio and
   deactivates its session at once, and comes back 3 s after the call ends.
 - **Auto-start.** Starts when the chosen car connects over Bluetooth, stops when it disconnects.
