@@ -45,6 +45,19 @@ object NavTextParser {
         return NavText(distance, road, eta, remaining, glyphFromWords(words))
     }
 
+    /**
+     * Maps alternates the real instruction ("170 m" / "Kodigehalli Main Rd") with a heading variant
+     * (empty or "0 m" title, "towards 2nd Cross Rd" text). Once a real instruction exists the variant
+     * only causes flicker. Arrival ("" / place name) and "Rerouting..." are not variants.
+     */
+    fun isHeadingVariant(title: String?, text: String?): Boolean {
+        val t = clean(title)
+        val x = clean(text)
+        val noDistance = t.isEmpty() || Regex("""^0 (m|ft|yd)$""").matches(t)
+        val towards = Regex("""(^|\s)towards?\s""", RegexOption.IGNORE_CASE).containsMatchIn(x)
+        return noDistance && towards
+    }
+
     /** "300 m" -> 300.0, "1.2 km" -> 1200.0; null for imperial units or anything else. */
     fun metersOf(distance: String): Double? {
         val m = Regex("""^(\d+(?:[.,]\d+)?) (m|km)$""").find(distance.trim()) ?: return null

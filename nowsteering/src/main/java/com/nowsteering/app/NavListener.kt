@@ -69,7 +69,13 @@ class NavListener : NotificationListenerService() {
         }
         if (!isNav) return
 
-        val parsed = NavTextParser.parse(title, text, sub, big)
+        val heading = NavTextParser.isHeadingVariant(title, text)
+        if (heading && NavState.hasRecentRealInstruction()) {
+            NsLog.log("MAPS", "ignored heading variant '$title' / '$text' (a real instruction is showing)")
+            return
+        }
+        // The variant comes as "0 m" or "" + "towards X"; show both the same way so the car doesn't flicker.
+        val parsed = NavTextParser.parse(title, text, sub, big).let { if (heading) it.copy(distance = "") else it }
         val mask = IconSig.mask(this, n.getLargeIcon())
         val hex = mask?.let { IconSig.hex(it) }
         val match = mask?.let { IconSig.match(it) }
@@ -80,7 +86,7 @@ class NavListener : NotificationListenerService() {
             parsed.textGlyph != null -> parsed.textGlyph to "text"
             else -> "•" to "unknown"
         }
-        NavState.update(sbn.key, NavState.Info(parsed, glyph, source, hex))
+        NavState.update(sbn.key, NavState.Info(parsed, glyph, source, hex), real = !heading)
     }
 
     /** Log each new icon shape once (as ASCII art + hex) so it can be labelled in [KnownIcons]. */
@@ -107,7 +113,14 @@ object NavState {
 
     val active get() = info != null
 
-    fun update(k: String, i: Info) {
+    private var lastRealAt = 0L
+
+    /** A real (non-heading) instruction arrived in the last 90 s of this trip. */
+    fun hasRecentRealInstruction() = info != null && android.os.SystemClock.elapsedRealtime() - lastRealAt < 90_000
+
+    /** [real] is false for the "towards X" heading variant (shown only until a real instruction arrives). */
+    fun update(k: String, i: Info, real: Boolean) {
+        if (real) lastRealAt = android.os.SystemClock.elapsedRealtime()
         val prev = info
         key = k
         info = i
@@ -119,6 +132,7 @@ object NavState {
     }
 
     fun end(reason: String) {
+        lastRealAt = 0L
         if (info == null) return
         info = null
         key = null

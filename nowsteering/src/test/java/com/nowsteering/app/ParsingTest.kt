@@ -66,6 +66,23 @@ class ParsingTest {
         assertEquals("0 m", NavTextParser.formatMeters(-5.0))
     }
 
+    @Test fun headingVariantDetection() {
+        assertEquals(true, NavTextParser.isHeadingVariant("", "towards 2nd Cross Rd"))
+        assertEquals(true, NavTextParser.isHeadingVariant("0 m", "Railway Parallel Rd towards Sahakar Nagar Railway Upas Rd"))
+        assertEquals(false, NavTextParser.isHeadingVariant("170 m", "Kodigehalli Main Rd"))
+        assertEquals(false, NavTextParser.isHeadingVariant("2.2 km", "towards Sardar Vallabhbhai Patel Rd"))
+        assertEquals(false, NavTextParser.isHeadingVariant("", "Glen’s Bakehouse Sahakarnagar")) // arrival
+        assertEquals(false, NavTextParser.isHeadingVariant("", "Rerouting..."))
+        assertEquals(false, NavTextParser.isHeadingVariant("0 m", "16th E Cross Rd"))
+    }
+
+    @Test fun cutsLongNamesAtWords() {
+        assertEquals("Glen's Bakehouse", Glyphs.sanitize("Glen’s Bakehouse Sahakarnagar", 18))
+        assertEquals("Kodigehalli Main", Glyphs.sanitize("Kodigehalli Main Rd", 18))
+        assertEquals("Sahakarnagarmainro", Glyphs.sanitize("Sahakarnagarmainroad", 18)) // no space: hard cut
+        assertEquals("13th Main Rd", Glyphs.sanitize("13th Main Rd", 18))
+    }
+
     @Test fun survivesGarbage() {
         val n = NavTextParser.parse(null, null, null)
         assertEquals("", n.distance); assertEquals("", n.road); assertEquals("", n.eta)
