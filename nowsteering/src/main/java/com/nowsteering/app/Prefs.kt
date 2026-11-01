@@ -37,6 +37,16 @@ object Prefs {
         get() = sp.getBoolean("idleSeconds", false)
         set(v) = sp.edit().putBoolean("idleSeconds", v).apply()
 
+    /** Turn bar in the last 300 m before a turn (replaces the ETA line). */
+    var turnBar: Boolean
+        get() = sp.getBoolean("turnBar", true)
+        set(v) = sp.edit().putBoolean("turnBar", v).apply()
+
+    /** Short trip-progress bar after the ETA. */
+    var tripBar: Boolean
+        get() = sp.getBoolean("tripBar", true)
+        set(v) = sp.edit().putBoolean("tripBar", v).apply()
+
     /** Icon signatures already written to the log, so each new Maps icon is logged once. */
     var seenIcons: Set<String>
         get() = sp.getStringSet("seenIcons", emptySet()) ?: emptySet()

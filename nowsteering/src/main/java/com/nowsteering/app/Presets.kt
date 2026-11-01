@@ -10,6 +10,11 @@ object Presets {
         "Confirmed glyphs" to "← → ↑ ↓ ↖ ↗ ° • ● ▲ ▶ ▼ █ ▓ ▒ ▄",
         "Fallback test" to "⇐ ⇒ ↘ ↙ ◀ ★ ✓ ─ ┼ ░ — … ₹",
         "Wide letters" to "WWWWWWWWWWWWWWWWWWWW",
+        "Turn bar (10 cells)" to "█████▒▒▒▒▒",
+        "Trip bar line" to "ETA 09:45 ███▒▒",
+        "Trip bar line 12h" to "ETA 9:45pm ███▒▒",
+        "18 full blocks" to "██████████████████",
+        "18 light blocks" to "▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒",
         "Devanagari + emoji" to "A नमस्ते B 🚗 C",
     )
 }

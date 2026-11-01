@@ -41,6 +41,16 @@ class MainActivity : BaseActivity() {
                 NsLog.log("UI", "auto-start = $b")
             }
         })
+        root.addView(CheckBox(this).apply {
+            text = "Turn bar (last 300 m before a turn)"
+            isChecked = Prefs.turnBar
+            setOnCheckedChangeListener { _, b -> Prefs.turnBar = b; NsLog.log("UI", "turn bar = $b") }
+        })
+        root.addView(CheckBox(this).apply {
+            text = "Trip bar (after the ETA)"
+            isChecked = Prefs.tripBar
+            setOnCheckedChangeListener { _, b -> Prefs.tripBar = b; NsLog.log("UI", "trip bar = $b") }
+        })
         row(button("Start now") { SteeringService.start(this, "Start tapped") },
             button("Stop") { SteeringService.stop(this, "Stop tapped") })
 

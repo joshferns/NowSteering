@@ -83,6 +83,18 @@ class ParsingTest {
         assertEquals("13th Main Rd", Glyphs.sanitize("13th Main Rd", 18))
     }
 
+    @Test fun bars() {
+        assertNull(Bars.turnBar(450.0))
+        assertEquals("▒▒▒▒▒▒▒▒▒▒", Bars.turnBar(300.0))
+        assertEquals("█████▒▒▒▒▒", Bars.turnBar(150.0))
+        assertEquals("██████████", Bars.turnBar(0.0))
+        assertEquals("███▒▒", Bars.tripBar(300.0, 750.0))
+        assertNull(Bars.tripBar(null, 750.0))
+        // Trip-bar ETA line fits the 18-char album line, also in 12-hour format.
+        assertEquals("ETA 09:45 ███▒▒", Glyphs.sanitize("ETA 09:45 " + Bars.tripBar(300.0, 750.0), Glyphs.LINE_MAX))
+        assertEquals("ETA 9:45pm ███▒▒", Glyphs.sanitize("ETA 9:45pm " + Bars.tripBar(300.0, 750.0), Glyphs.LINE_MAX))
+    }
+
     @Test fun survivesGarbage() {
         val n = NavTextParser.parse(null, null, null)
         assertEquals("", n.distance); assertEquals("", n.road); assertEquals("", n.eta)
