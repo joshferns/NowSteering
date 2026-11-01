@@ -49,6 +49,23 @@ class ParsingTest {
         assertEquals("U", NavTextParser.glyphFromWords("make a u-turn"))
     }
 
+    @Test fun keepsFirstNameOfSlashedRoads() {
+        assertEquals("15th Cross Rd", NavTextParser.parse("10 m", "15th Cross Rd / 1st Main Rd", "").road)
+        assertEquals("Glen’s Bakehouse Sahakarnagar",
+            NavTextParser.parse("550 m", "Glen’s Bakehouse Sahakarnagar  / No. 552, Sahakarnagar Main Rd", "").road)
+    }
+
+    @Test fun distanceRoundTrip() {
+        assertEquals(300.0, NavTextParser.metersOf("300 m")!!, 0.01)
+        assertEquals(1200.0, NavTextParser.metersOf("1.2 km")!!, 0.01)
+        assertNull(NavTextParser.metersOf("0.3 mi"))
+        assertEquals("170 m", NavTextParser.formatMeters(173.0))
+        assertEquals("650 m", NavTextParser.formatMeters(640.0))
+        assertEquals("950 m", NavTextParser.formatMeters(990.0))
+        assertEquals("1.9 km", NavTextParser.formatMeters(1940.0))
+        assertEquals("0 m", NavTextParser.formatMeters(-5.0))
+    }
+
     @Test fun survivesGarbage() {
         val n = NavTextParser.parse(null, null, null)
         assertEquals("", n.distance); assertEquals("", n.road); assertEquals("", n.eta)

@@ -30,6 +30,8 @@ object NavTextParser {
         val towards = Regex("""\s+towards?\s+""", RegexOption.IGNORE_CASE)
         if (towards.containsMatchIn(road)) road = road.split(towards, 2)[0]
         if (road.isEmpty() && distance.isEmpty()) road = t // e.g. "Rerouting…" or an instruction in the title
+        // "15th Cross Rd / 1st Main Rd" or "Glen's Bakehouse / No. 552, Main Rd": the first name is enough.
+        road = road.split(" / ", limit = 2)[0].trim()
         road = road.replace(Regex("""^towards?\s+""", RegexOption.IGNORE_CASE), "to ")
         road = road.replace(Regex("""^(turn|keep|bear|slight|sharp|continue|head|make|take|merge)\b.*?\b(onto|on|to)\s+""", RegexOption.IGNORE_CASE), "")
 
@@ -41,6 +43,21 @@ object NavTextParser {
 
         val words = listOf(t, x, clean(bigText)).joinToString(" ").lowercase()
         return NavText(distance, road, eta, remaining, glyphFromWords(words))
+    }
+
+    /** "300 m" -> 300.0, "1.2 km" -> 1200.0; null for imperial units or anything else. */
+    fun metersOf(distance: String): Double? {
+        val m = Regex("""^(\d+(?:[.,]\d+)?) (m|km)$""").find(distance.trim()) ?: return null
+        val v = m.groupValues[1].replace(',', '.').toDoubleOrNull() ?: return null
+        return if (m.groupValues[2] == "km") v * 1000 else v
+    }
+
+    /** Formats like Maps does: 10 m steps below 300 m, 50 m steps below 1 km, then 0.1 km. */
+    fun formatMeters(m: Double): String = when {
+        m <= 0 -> "0 m"
+        m < 300 -> "${(Math.round(m / 10) * 10)} m"
+        m < 1000 -> "${(Math.round(m / 50) * 50).coerceAtMost(950)} m"
+        else -> String.format(java.util.Locale.US, "%.1f km", m / 1000)
     }
 
     private fun clean(s: String?) = (s ?: "").replace(' ', ' ').replace(' ', ' ').replace(Regex("\\s+"), " ").trim()
