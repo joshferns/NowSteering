@@ -39,7 +39,10 @@ object Glyphs {
             }
         }
         val collapsed = sb.toString().replace(' ', ' ').replace(Regex(" {2,}"), " ").trim()
-        return collapsed.take(max).trimEnd()
+        if (collapsed.length <= max) return collapsed
+        // Cut at a word boundary ("Glen's Bakehouse", not "Glen's Bakehouse S") unless that loses too much.
+        val cut = collapsed.take(max + 1).lastIndexOf(' ')
+        return if (cut >= max * 6 / 10) collapsed.take(cut).trimEnd() else collapsed.take(max).trimEnd()
     }
 }
 
