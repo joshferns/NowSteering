@@ -82,6 +82,8 @@ class SteeringService : Service() {
     var mode = Mode.AUTO
         private set
     private var testScreen: Screen? = null
+    /** Shown from arrival until the car moves, a new trip starts, double Next, or the car disconnects. */
+    private var arrived: Screen? = null
     private var notice: Screen? = null
     private var noticeUntil = 0L
 
@@ -236,7 +238,8 @@ class SteeringService : Service() {
     private fun logPowerSave(why: String) {
         val pm = getSystemService(android.os.PowerManager::class.java)
         // locationPowerSaveMode: 0 no change, 1 GPS off when screen off, 2 all location off when screen off, 3 foreground only, 4 throttled when screen off
-        NsLog.log("PHONE", "power saving $why: on=${pm.isPowerSaveMode} locationMode=${pm.locationPowerSaveMode}")
+        NsLog.log("PHONE", "power saving $why: on=${pm.isPowerSaveMode} locationMode=${pm.locationPowerSaveMode} " +
+            "mapsBatteryExempt=${pm.isIgnoringBatteryOptimizations(NavListener.MAPS)}")
     }
 
     private fun sendToCar(s: Screen) {
@@ -307,8 +310,9 @@ class SteeringService : Service() {
             val left = last?.text?.remaining?.let { NavTextParser.metersOf(it) }
             if (left != null && left <= 150) {
                 // Maps ends navigation by itself on arrival: say so instead of jumping straight to the clock.
-                NsLog.log("SCREEN", "nav ended on arrival (${last.text.remaining} left): arrived screen for 10 s")
-                showNotice(Screen("● Arrived", last.text.road, clockFmt.format(Date())), 10_000)
+                NsLog.log("SCREEN", "nav ended on arrival (${last.text.remaining} left): arrived screen until the car moves")
+                arrived = Screen("● Arrived", last.text.road, clockFmt.format(Date()))
+                refreshScreen()
             } else {
                 NsLog.log("SCREEN", "nav ended before arrival (${last?.text?.remaining ?: "?"} left): idle screen")
                 showNotice(Screen("Nav ended", "", ""), 4000)
@@ -317,6 +321,7 @@ class SteeringService : Service() {
         }
         lastNav = info
         notice = null // a new trip replaces any "Arrived" message
+        clearArrived("new navigation")
         updateDeadReckoning(info)
         if (info.instructionId != lastInstruction) {
             val first = lastInstruction == null
@@ -326,8 +331,19 @@ class SteeringService : Service() {
         refreshScreen()
     }
 
+    private fun clearArrived(why: String) {
+        if (arrived == null) return
+        arrived = null
+        NsLog.log("SCREEN", "arrived screen cleared ($why): clock screen")
+        refreshScreen()
+    }
+
     private fun toggleNavIdle() {
         if (mode == Mode.TEST) return
+        if (arrived != null) {
+            clearArrived("double Next")
+            return
+        }
         if (!NavState.active) {
             NsLog.log("SCREEN", "double Next: not navigating, staying on idle")
             return
@@ -363,6 +379,7 @@ class SteeringService : Service() {
         val s = when {
             notice != null && SystemClock.elapsedRealtime() < noticeUntil -> notice!!
             mode == Mode.TEST -> testScreen ?: idleScreen()
+            arrived != null -> arrived!!
             nav != null && mode == Mode.AUTO -> navScreen(nav)
             else -> idleScreen()
         }
@@ -434,6 +451,7 @@ class SteeringService : Service() {
             speedKmh = if (k < 2) 0 else k
             speedAt = now
             if (gpsStale) { gpsStale = false; NsLog.log("GPS", "fixes coming in") }
+            if (arrived != null && k > 10) clearArrived("moving at $k km/h")
         }
     }
 
