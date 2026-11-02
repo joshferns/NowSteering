@@ -59,10 +59,15 @@ class ParsingTest {
         assertEquals(300.0, NavTextParser.metersOf("300 m")!!, 0.01)
         assertEquals(1200.0, NavTextParser.metersOf("1.2 km")!!, 0.01)
         assertNull(NavTextParser.metersOf("0.3 mi"))
-        assertEquals("170 m", NavTextParser.formatMeters(173.0))
+        // Rounds up to Maps' steps, so it never reads lower than the estimate.
+        assertEquals("180 m", NavTextParser.formatMeters(173.0))
+        assertEquals("290 m", NavTextParser.formatMeters(290.0))
+        assertEquals("600 m", NavTextParser.formatMeters(566.0))
+        assertEquals("550 m", NavTextParser.formatMeters(550.0))
         assertEquals("650 m", NavTextParser.formatMeters(640.0))
-        assertEquals("950 m", NavTextParser.formatMeters(990.0))
-        assertEquals("1.9 km", NavTextParser.formatMeters(1940.0))
+        assertEquals("1.0 km", NavTextParser.formatMeters(990.0))
+        assertEquals("2.0 km", NavTextParser.formatMeters(1940.0))
+        assertEquals("1.2 km", NavTextParser.formatMeters(1200.0)) // Maps' own values pass through unchanged
         assertEquals("0 m", NavTextParser.formatMeters(-5.0))
     }
 

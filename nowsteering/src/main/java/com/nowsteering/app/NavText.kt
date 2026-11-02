@@ -68,12 +68,19 @@ object NavTextParser {
         return if (m.groupValues[2] == "km") v * 1000 else v
     }
 
-    /** Formats like Maps does: 10 m steps below 300 m, 50 m steps below 1 km, then 0.1 km. */
-    fun formatMeters(m: Double): String = when {
-        m <= 0 -> "0 m"
-        m < 300 -> "${(Math.round(m / 10) * 10)} m"
-        m < 1000 -> "${(Math.round(m / 50) * 50).coerceAtMost(950)} m"
-        else -> String.format(java.util.Locale.US, "%.1f km", m / 1000)
+    /**
+     * Formats like Maps does: 10 m steps below 300 m, 50 m steps below 1 km, then 0.1 km.
+     * Rounds UP to the step, so the car never shows a smaller distance than our estimate
+     * (rounding to nearest showed "550 m" for 566 m, a second before Maps said 550).
+     */
+    fun formatMeters(m: Double): String {
+        if (m <= 0) return "0 m"
+        fun up(step: Double) = Math.ceil(m / step - 1e-6) * step
+        return when {
+            m < 300 -> "${up(10.0).toInt()} m"
+            up(50.0) < 1000 -> "${up(50.0).toInt()} m"
+            else -> String.format(java.util.Locale.US, "%.1f km", up(100.0) / 1000)
+        }
     }
 
     private fun clean(s: String?) = (s ?: "").replace(' ', ' ').replace(' ', ' ').replace(Regex("\\s+"), " ").trim()
