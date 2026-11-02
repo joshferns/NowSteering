@@ -376,7 +376,8 @@ class SteeringService : Service() {
             return
         }
         // A new route flips between instructions for a few seconds; only show a change that holds for 3 s.
-        val settling = SystemClock.elapsedRealtime() - navStartAt < 30_000
+        val rerouting = NavTextParser.isRerouting(info.text.road)
+        val settling = !rerouting && SystemClock.elapsedRealtime() - navStartAt < 30_000
         val established = shownNav?.text?.distance?.isNotEmpty() == true // not just "Starting navigation…"
         if (settling && established && info.instructionId != shownNav!!.instructionId) {
             if (pendingNav?.instructionId != info.instructionId) {
@@ -475,6 +476,8 @@ class SteeringService : Service() {
 
     private fun navScreen(i: NavState.Info): Screen {
         val t = i.text
+        // A real reroute: say so until Maps sends the new instruction.
+        if (NavTextParser.isRerouting(t.road)) return Screen("• Rerouting...", "", "")
         val toTurn = dr.shown()
         val distance = toTurn?.let { NavTextParser.formatMeters(it) } ?: t.distance
         val title = "${i.glyph} $distance".trim()

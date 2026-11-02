@@ -58,6 +58,9 @@ object NavTextParser {
         return noDistance && towards
     }
 
+    /** Maps' "Rerouting..." notification. */
+    fun isRerouting(text: String?) = clean(text).startsWith("Rerouting", ignoreCase = true)
+
     /** "300 m" -> 300.0, "1.2 km" -> 1200.0; null for imperial units or anything else. */
     fun metersOf(distance: String): Double? {
         val m = Regex("""^(\d+(?:[.,]\d+)?) (m|km)$""").find(distance.trim()) ?: return null

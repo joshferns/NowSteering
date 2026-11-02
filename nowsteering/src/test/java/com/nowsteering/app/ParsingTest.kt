@@ -95,6 +95,13 @@ class ParsingTest {
         assertEquals("ETA 9:45pm ███▒▒", Glyphs.sanitize("ETA 9:45pm " + Bars.tripBar(300.0, 750.0), Glyphs.LINE_MAX))
     }
 
+    @Test fun reroutingDetected() {
+        assertEquals(true, NavTextParser.isRerouting("Rerouting..."))
+        assertEquals(true, NavTextParser.isRerouting(NavTextParser.parse("", "Rerouting...", "").road))
+        assertEquals(false, NavTextParser.isRerouting("15th Cross Rd"))
+        assertEquals("• Rerouting...", Glyphs.sanitize("• Rerouting...", Glyphs.TITLE_MAX))
+    }
+
     @Test fun survivesGarbage() {
         val n = NavTextParser.parse(null, null, null)
         assertEquals("", n.distance); assertEquals("", n.road); assertEquals("", n.eta)

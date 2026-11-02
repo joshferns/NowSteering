@@ -38,6 +38,8 @@ Then **Choose car** → pick the car (e.g. "Honda HFT") and leave *Start automat
   trip bar `ETA 09:45 ███▒▒` shows overall trip progress.
 - **Arrival.** `● Arrived` as soon as Maps shows its destination marker within 30 m. It stays until the car
   stops and moves off again (> 10 km/h), moves 300 m away, a new trip starts, double Next, 20 min pass, or the car disconnects.
+- **Rerouting.** Maps' "Rerouting..." shows as `• Rerouting...` until the new instruction arrives; Maps' blank / no-distance
+  in-between notifications keep the previous instruction on screen.
 - **Power saving must be off** (it blocks our GPS with the screen off). When it's on, the car shows
   "Power saving on / nav less smooth" at start, at each new trip and when it's switched on.
 - **Calls.** On any call (ringing, in call, VoIP; via AudioManager mode) the app stops its audio and

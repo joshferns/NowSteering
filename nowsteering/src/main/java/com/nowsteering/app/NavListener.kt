@@ -84,12 +84,12 @@ class NavListener : NotificationListenerService() {
         }
 
         // Once a real instruction is showing, hold it through Maps' in-between notifications:
-        // "towards X", no-distance "current road" (e.g. '' / "15th Cross Rd" right after a turn) and "Rerouting...".
-        // The destination marker is never held back: it is how arrival is detected.
+        // "towards X" and no-distance "current road" (e.g. '' / "15th Cross Rd" right after a turn).
+        // Not held back: "Rerouting..." (a real reroute, shown as such) and the destination marker (arrival).
         val noDistance = heading || parsed.distance.isEmpty()
-        val rerouting = text?.startsWith("Rerouting", ignoreCase = true) == true
-        if ((noDistance || rerouting) && glyph != "●" && NavState.hasRecentRealInstruction()) {
-            NsLog.log("MAPS", "held previous screen over '$title' / '$text'" + if (rerouting) " (rerouting)" else " (no distance)")
+        val rerouting = NavTextParser.isRerouting(text)
+        if (noDistance && !rerouting && glyph != "●" && NavState.hasRecentRealInstruction()) {
+            NsLog.log("MAPS", "held previous screen over '$title' / '$text' (no distance)")
             return
         }
         NavState.update(sbn.key, NavState.Info(parsed, glyph, source, hex),
