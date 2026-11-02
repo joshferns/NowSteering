@@ -58,10 +58,13 @@ class NsApp : Application() {
     /** Power saving (Battery saver) can turn GPS off while the screen is off. */
     fun powerSaveOn() = getSystemService(PowerManager::class.java).isPowerSaveMode
 
+    /** Whether Android's battery optimisation is off for Google Maps (Settings: Apps → Maps → Battery → Unrestricted). */
+    fun mapsBatteryExempt() = getSystemService(PowerManager::class.java).isIgnoringBatteryOptimizations(NavListener.MAPS)
+
     fun batteryExempt() = getSystemService(PowerManager::class.java).isIgnoringBatteryOptimizations(packageName)
 
     fun permSummary() = "listener=${listenerEnabled()} battery=${batteryExempt()} " +
-        "powerSave=${powerSaveOn()} notif=${granted(Manifest.permission.POST_NOTIFICATIONS)} bt=${granted(Manifest.permission.BLUETOOTH_CONNECT)} " +
+        "powerSave=${powerSaveOn()} mapsBattery=${mapsBatteryExempt()} notif=${granted(Manifest.permission.POST_NOTIFICATIONS)} bt=${granted(Manifest.permission.BLUETOOTH_CONNECT)} " +
         "gps=${granted(Manifest.permission.ACCESS_FINE_LOCATION)} gpsBackground=${granted(Manifest.permission.ACCESS_BACKGROUND_LOCATION)}"
 
     fun header() = buildString {

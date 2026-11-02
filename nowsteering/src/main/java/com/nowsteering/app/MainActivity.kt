@@ -97,13 +97,14 @@ class MainActivity : BaseActivity() {
             "Notification access: nav + wheel buttons (step 2)" to app.listenerEnabled(),
             "Car chosen" to (Prefs.carAddress != null),
             "Battery not optimised (step 5)" to app.batteryExempt(),
+            "Power saving OFF (it blocks GPS when locked)" to !app.powerSaveOn(),
             "GPS all the time (step 4)" to app.granted(Manifest.permission.ACCESS_BACKGROUND_LOCATION),
             "Notifications + Bluetooth (step 3)" to (app.granted(Manifest.permission.POST_NOTIFICATIONS) && app.granted(Manifest.permission.BLUETOOTH_CONNECT)),
         )
         val missing = checks.count { !it.second }
         checklist.text = (if (missing == 0) "Setup complete\n" else "SETUP INCOMPLETE: $missing missing\n") +
             checks.joinToString("\n") { (name, ok) -> (if (ok) "OK   " else "MISSING  ") + name }
-        if (app.powerSaveOn()) checklist.append("\nNOTE  Power saving is on: nav may update slowly when locked")
+        checklist.append("\nINFO  Google Maps battery: " + if (app.mapsBatteryExempt()) "not optimised" else "optimised")
         checklist.setBackgroundColor(if (missing == 0) 0x3322AA22 else 0x55DD2222)
         val s = SteeringService.instance
         status.text = buildString {
