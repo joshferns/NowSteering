@@ -92,14 +92,18 @@ class SteeringService : Service() {
     private var speedAt = 0L
     private var gpsStale = true
 
-    // Dead reckoning: with the phone locked Maps only updates every 10-25 s, so between its
-    // updates we count the turn distance down using our own GPS speed.
-    private var drInstruction: String? = null
-    private var drDistanceText: String? = null
-    private var drBaseMeters: Double? = null
-    private var drBaseAt = 0L
-    private var drTravelled = 0.0
+    // Distance to the turn: Maps' value, counted down with GPS speed when Maps goes quiet (phone locked).
+    private val dr = DeadReckoner { SystemClock.elapsedRealtime() }
     private var lastNav: NavState.Info? = null
+    /** The instruction on the car; can lag NavState.info briefly while a new route settles. */
+    private var shownNav: NavState.Info? = null
+    private var navStartAt = 0L
+    private var pendingNav: NavState.Info? = null
+    private var arrivedAt = 0L
+    private var arrivedLoc: Location? = null
+    private var lastLoc: Location? = null
+    private var navEndedSinceArrival = false
+    private var stoppedSinceArrival = false // arrival is detected ~20 m out, often still rolling
     private var tripMeters: Double? = null // longest distance-left seen this trip, for the trip bar
     private var locationOn = false
     private var wakeLock: android.os.PowerManager.WakeLock? = null
@@ -144,6 +148,7 @@ class SteeringService : Service() {
         if (!NsApp.instance.listenerEnabled()) NsLog.log("SERVICE", "WARNING: notification access is OFF: no nav, no music control")
         callGuard.start() // steps aside straight away if a call is already on
         if (!callGuard.inCall) comeBack()
+        powerSaveWarning("service start")
         main.post(ticker)
     }
 
@@ -230,13 +235,20 @@ class SteeringService : Service() {
                 Intent.ACTION_SCREEN_ON -> NsLog.log("PHONE", "screen on")
                 Intent.ACTION_SCREEN_OFF -> NsLog.log("PHONE", "screen off")
                 Intent.ACTION_USER_PRESENT -> NsLog.log("PHONE", "unlocked")
-                android.os.PowerManager.ACTION_POWER_SAVE_MODE_CHANGED -> logPowerSave("changed")
+                android.os.PowerManager.ACTION_POWER_SAVE_MODE_CHANGED -> { logPowerSave("changed"); powerSaveWarning("turned on") }
                 android.bluetooth.BluetoothA2dp.ACTION_PLAYING_STATE_CHANGED -> {
                     val st = i.getIntExtra(android.bluetooth.BluetoothProfile.EXTRA_STATE, -1)
                     NsLog.log("BT", "A2DP audio stream " + if (st == android.bluetooth.BluetoothA2dp.STATE_PLAYING) "PLAYING" else "NOT_PLAYING ($st)")
                 }
             }
         }
+    }
+
+    /** Power saving stops our GPS with the screen off: say so on the car instead of degrading silently. */
+    private fun powerSaveWarning(why: String) {
+        if (!getSystemService(android.os.PowerManager::class.java).isPowerSaveMode) return
+        NsLog.log("PHONE", "power saving is on ($why): warning on the car")
+        showNotice(Screen("Power saving on", "nav less smooth", "turn it off"), 6000)
     }
 
     private fun logPowerSave(why: String) {
@@ -296,7 +308,7 @@ class SteeringService : Service() {
         stopSilence()
         startSilence()
         setPlaying()
-        engine.current?.let { engine.show(it, force = true) }
+        refreshScreen(force = true) // the latest screen; re-sending the last-sent one showed stale text for ~1 s
     }
 
     // ---- Call safeguard ----
@@ -324,28 +336,69 @@ class SteeringService : Service() {
     private fun onNav(info: NavState.Info?) {
         if (info == null) {
             lastInstruction = null
-            drBaseMeters = null
+            dr.reset()
             tripMeters = null
+            shownNav = null
+            pendingNav = null
+            main.removeCallbacks(settle)
             if (mode == Mode.IDLE_WHILE_NAV) mode = Mode.AUTO
             val last = lastNav
             lastNav = null
+            if (arrived != null) {
+                navEndedSinceArrival = true
+                NsLog.log("SCREEN", "nav ended after arrival: arrived screen stays until the car moves")
+                return
+            }
             val left = last?.text?.remaining?.let { NavTextParser.metersOf(it) }
             if (left != null && left <= 150) {
                 // Maps ends navigation by itself on arrival: say so instead of jumping straight to the clock.
-                NsLog.log("SCREEN", "nav ended on arrival (${last.text.remaining} left): arrived screen until the car moves")
-                arrived = Screen("● Arrived", last.text.road, clockFmt.format(Date()))
-                refreshScreen()
+                setArrived(last, "nav ended with ${last.text.remaining} left")
+                navEndedSinceArrival = true
             } else {
                 NsLog.log("SCREEN", "nav ended before arrival (${last?.text?.remaining ?: "?"} left): idle screen")
                 showNotice(Screen("Nav ended", "", ""), 4000)
             }
             return
         }
+        if (lastNav == null) {
+            navStartAt = SystemClock.elapsedRealtime()
+            if (navEndedSinceArrival) clearArrived("new navigation")
+            powerSaveWarning("navigation started")
+        }
         lastNav = info
+        notice = null
+        // Destination marker within 30 m: arrived now (Maps can take a minute to end navigation).
+        val left = NavTextParser.metersOf(info.text.remaining)
+        if (info.glyph == "●" && left != null && left <= 30) {
+            if (arrived == null) setArrived(info, "destination marker with ${info.text.remaining} left")
+            else if (info.text.road.isNotEmpty()) arrived = arrived!!.copy(artist = info.text.road)
+            refreshScreen()
+            return
+        }
+        // A new route flips between instructions for a few seconds; only show a change that holds for 3 s.
+        val settling = SystemClock.elapsedRealtime() - navStartAt < 30_000
+        val established = shownNav?.text?.distance?.isNotEmpty() == true // not just "Starting navigation…"
+        if (settling && established && info.instructionId != shownNav!!.instructionId) {
+            if (pendingNav?.instructionId != info.instructionId) {
+                main.removeCallbacks(settle)
+                main.postDelayed(settle, 3000)
+            }
+            pendingNav = info
+            return
+        }
+        pendingNav = null
+        main.removeCallbacks(settle)
+        apply(info)
+    }
+
+    private val settle = Runnable {
+        pendingNav?.let { NsLog.log("NAV", "start-up: '${it.text.road}' held 3 s, showing it"); pendingNav = null; apply(it) }
+    }
+
+    private fun apply(info: NavState.Info) {
+        shownNav = info
         NavTextParser.metersOf(info.text.remaining)?.let { m -> tripMeters = maxOf(tripMeters ?: 0.0, m) }
-        notice = null // a new trip replaces any "Arrived" message
-        clearArrived("new navigation")
-        updateDeadReckoning(info)
+        dr.onMaps(info.instructionId, info.text.distance, NavTextParser.metersOf(info.text.distance))?.let { NsLog.log("DR", it) }
         if (info.instructionId != lastInstruction) {
             val first = lastInstruction == null
             lastInstruction = info.instructionId
@@ -354,9 +407,20 @@ class SteeringService : Service() {
         refreshScreen()
     }
 
+    private fun setArrived(i: NavState.Info, why: String) {
+        arrived = Screen("● Arrived", i.text.road, clockFmt.format(Date()))
+        arrivedAt = SystemClock.elapsedRealtime()
+        arrivedLoc = lastLoc
+        navEndedSinceArrival = false
+        stoppedSinceArrival = false
+        NsLog.log("SCREEN", "arrived ($why): stays until the car moves, a new trip, double Next or disconnect")
+        refreshScreen()
+    }
+
     private fun clearArrived(why: String) {
         if (arrived == null) return
         arrived = null
+        arrivedLoc = null
         NsLog.log("SCREEN", "arrived screen cleared ($why): clock screen")
         refreshScreen()
     }
@@ -398,7 +462,7 @@ class SteeringService : Service() {
     }
 
     private fun refreshScreen(force: Boolean = false) {
-        val nav = NavState.info
+        val nav = if (NavState.active) shownNav else null
         val s = when {
             notice != null && SystemClock.elapsedRealtime() < noticeUntil -> notice!!
             mode == Mode.TEST -> testScreen ?: idleScreen()
@@ -409,45 +473,16 @@ class SteeringService : Service() {
         engine.show(s, force)
     }
 
-    /** Re-base the estimate whenever Maps gives a new instruction or a new distance; a repeated (stale) distance is ignored. */
-    private fun updateDeadReckoning(i: NavState.Info) {
-        val meters = NavTextParser.metersOf(i.text.distance)
-        if (i.instructionId == drInstruction && i.text.distance == drDistanceText) return
-        val est = estimatedMeters()
-        if (est != null && i.instructionId == drInstruction && meters != null && meters > est && meters - est < 30) {
-            // Maps is a little behind our estimate: keep counting down instead of jumping back up.
-            NsLog.log("DR", "Maps ${i.text.distance}, estimate ${NavTextParser.formatMeters(est)}: ignored upward correction of ${(meters - est).roundToInt()} m")
-            drDistanceText = i.text.distance
-            return
-        }
-        if (est != null && i.instructionId == drInstruction && meters != null) {
-            NsLog.log("DR", "Maps ${i.text.distance}, estimate was ${NavTextParser.formatMeters(est)} " +
-                "(error ${(est - meters).roundToInt()} m after ${(SystemClock.elapsedRealtime() - drBaseAt) / 1000} s)")
-        }
-        drInstruction = i.instructionId
-        drDistanceText = i.text.distance
-        drBaseMeters = meters
-        drBaseAt = SystemClock.elapsedRealtime()
-        drTravelled = 0.0
-    }
-
-    /** Distance to the turn counted down from Maps' last value, or null when not estimating. */
-    private fun estimatedMeters(): Double? {
-        val base = drBaseMeters ?: return null
-        if (drTravelled < 1 || SystemClock.elapsedRealtime() - drBaseAt > 90_000) return null
-        return (base - drTravelled).coerceAtLeast(0.0)
-    }
-
     private fun navScreen(i: NavState.Info): Screen {
         val t = i.text
-        val distance = estimatedMeters()?.let { NavTextParser.formatMeters(it) } ?: t.distance
+        val toTurn = dr.shown()
+        val distance = toTurn?.let { NavTextParser.formatMeters(it) } ?: t.distance
         val title = "${i.glyph} $distance".trim()
-        val toTurn = estimatedMeters() ?: NavTextParser.metersOf(t.distance)
         val turnBar = if (Prefs.turnBar) Bars.turnBar(toTurn) else null
         val tripBar = if (Prefs.tripBar) Bars.tripBar(NavTextParser.metersOf(t.remaining), tripMeters) else null
         val eta = t.eta.takeIf { it.isNotEmpty() }?.let { "ETA $it" }
         val album = when {
-            turnBar != null -> turnBar // last 300 m before the turn
+            turnBar != null -> "${i.glyph} $turnBar" // last 300 m before the turn, led by its arrow
             tripBar != null && eta != null -> "$eta $tripBar"
             else -> listOfNotNull(eta, t.remaining.replace(" ", "").takeIf { it.isNotEmpty() }).joinToString(" ")
         }
@@ -470,6 +505,7 @@ class SteeringService : Service() {
     private val ticker = object : Runnable {
         override fun run() {
             checkGpsStale()
+            if (arrived != null && SystemClock.elapsedRealtime() - arrivedAt > 20 * 60_000) clearArrived("20 min since arrival")
             refreshScreen() // engine skips it unless the text changed
             main.postDelayed(this, 1000)
         }
@@ -481,14 +517,28 @@ class SteeringService : Service() {
         if (loc.hasSpeed()) {
             val now = SystemClock.elapsedRealtime()
             // Only count distance between fixes that are close together (GPS gaps are not guessed over).
-            if (drBaseMeters != null && now - speedAt <= 3000) drTravelled += speedMps * (now - speedAt) / 1000.0
+            if (now - speedAt <= 3000) dr.onSpeed(speedMps.toDouble(), now - speedAt)
             speedMps = loc.speed
             val k = (loc.speed * 3.6f).roundToInt()
             speedKmh = if (k < 2) 0 else k
             speedAt = now
             if (gpsStale) { gpsStale = false; NsLog.log("GPS", "fixes coming in") }
-            if (arrived != null && k > 10) clearArrived("moving at $k km/h")
+            if (arrived != null && k <= 5) stoppedSinceArrival = true
+            if (arrived != null && stoppedSinceArrival && k > 10) clearArrived("moving again at $k km/h")
         }
+        onAnyLocation(loc)
+    }
+
+    /** Network / passive fixes still arrive when Power saving blocks our GPS: used to notice driving away. */
+    private val anyLocListener = LocationListener { loc: Location -> onAnyLocation(loc) }
+
+    private fun onAnyLocation(loc: Location) {
+        lastLoc = loc
+        if (arrived == null) return
+        val from = arrivedLoc
+        if (from == null) { arrivedLoc = loc; return }
+        val moved = from.distanceTo(loc)
+        if (moved > 300) clearArrived("moved ${moved.roundToInt()} m from where we arrived (${loc.provider})")
     }
 
     private fun checkGpsStale() {
@@ -508,6 +558,12 @@ class SteeringService : Service() {
         try {
             getSystemService(LocationManager::class.java)
                 .requestLocationUpdates(LocationManager.GPS_PROVIDER, 1000L, 0f, locListener, Looper.getMainLooper())
+            val lm = getSystemService(LocationManager::class.java)
+            for (p in listOf(LocationManager.PASSIVE_PROVIDER, LocationManager.NETWORK_PROVIDER)) {
+                if (p == LocationManager.PASSIVE_PROVIDER || lm.isProviderEnabled(p)) {
+                    lm.requestLocationUpdates(p, 10_000L, 0f, anyLocListener, Looper.getMainLooper())
+                }
+            }
             locationOn = true
             NsLog.log("GPS", "speed updates on")
         } catch (e: Exception) {
@@ -516,7 +572,10 @@ class SteeringService : Service() {
     }
 
     private fun stopLocation() {
-        if (locationOn) getSystemService(LocationManager::class.java).removeUpdates(locListener)
+        if (locationOn) {
+            getSystemService(LocationManager::class.java).removeUpdates(locListener)
+            getSystemService(LocationManager::class.java).removeUpdates(anyLocListener)
+        }
         locationOn = false
     }
 
