@@ -70,10 +70,6 @@ class NavListener : NotificationListenerService() {
         if (!isNav) return
 
         val heading = NavTextParser.isHeadingVariant(title, text)
-        if (heading && NavState.hasRecentRealInstruction()) {
-            NsLog.log("MAPS", "ignored heading variant '$title' / '$text' (a real instruction is showing)")
-            return
-        }
         // The variant comes as "0 m" or "" + "towards X"; show both the same way so the car doesn't flicker.
         val parsed = NavTextParser.parse(title, text, sub, big).let { if (heading) it.copy(distance = "") else it }
         val mask = IconSig.mask(this, n.getLargeIcon())
@@ -86,8 +82,18 @@ class NavListener : NotificationListenerService() {
             parsed.textGlyph != null -> parsed.textGlyph to "text"
             else -> "•" to "unknown"
         }
+
+        // Once a real instruction is showing, hold it through Maps' in-between notifications:
+        // "towards X", no-distance "current road" (e.g. '' / "15th Cross Rd" right after a turn) and "Rerouting...".
+        // The destination marker is never held back: it is how arrival is detected.
+        val noDistance = heading || parsed.distance.isEmpty()
+        val rerouting = text?.startsWith("Rerouting", ignoreCase = true) == true
+        if ((noDistance || rerouting) && glyph != "●" && NavState.hasRecentRealInstruction()) {
+            NsLog.log("MAPS", "held previous screen over '$title' / '$text'" + if (rerouting) " (rerouting)" else " (no distance)")
+            return
+        }
         NavState.update(sbn.key, NavState.Info(parsed, glyph, source, hex),
-            real = !heading && parsed.distance.isNotEmpty()) // "Starting navigation…" is not a real instruction yet
+            real = !noDistance && !rerouting) // "Starting navigation…" is not a real instruction yet
     }
 
     /** Log each new icon shape once (as ASCII art + hex) so it can be labelled in [KnownIcons]. */
