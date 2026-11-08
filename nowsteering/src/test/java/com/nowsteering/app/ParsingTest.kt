@@ -93,11 +93,11 @@ class ParsingTest {
         assertEquals("▒▒▒▒▒▒▒▒▒▒", Bars.turnBar(300.0))
         assertEquals("█████▒▒▒▒▒", Bars.turnBar(150.0))
         assertEquals("██████████", Bars.turnBar(0.0))
-        assertEquals("███▒▒", Bars.tripBar(300.0, 750.0))
+        assertEquals("████▒▒", Bars.tripBar(300.0, 750.0))
         assertNull(Bars.tripBar(null, 750.0))
         // Trip-bar ETA line fits the 18-char album line, also in 12-hour format.
-        assertEquals("ETA 09:45 ███▒▒", Glyphs.sanitize("ETA 09:45 " + Bars.tripBar(300.0, 750.0), Glyphs.LINE_MAX))
-        assertEquals("ETA 9:45pm ███▒▒", Glyphs.sanitize("ETA 9:45pm " + Bars.tripBar(300.0, 750.0), Glyphs.LINE_MAX))
+        assertEquals("ETA 09:45 ████▒▒", Glyphs.sanitize("ETA 09:45 " + Bars.tripBar(300.0, 750.0), Glyphs.LINE_MAX))
+        assertEquals("ETA 9:45pm ████▒▒", Glyphs.sanitize("ETA 9:45pm " + Bars.tripBar(300.0, 750.0), Glyphs.LINE_MAX))
     }
 
     @Test fun reroutingDetected() {
@@ -105,6 +105,16 @@ class ParsingTest {
         assertEquals(true, NavTextParser.isRerouting(NavTextParser.parse("", "Rerouting...", "").road))
         assertEquals(false, NavTextParser.isRerouting("15th Cross Rd"))
         assertEquals("• Rerouting...", Glyphs.sanitize("• Rerouting...", Glyphs.TITLE_MAX))
+    }
+
+    @Test fun parsesTimeLeft() {
+        assertEquals("7 min", NavTextParser.parse("300 m", "13th Main Rd", "7 min · 2.6 km · 07:04 ETA").timeLeft)
+        assertEquals("1 hr 5 min", NavTextParser.parse("1.2 km", "MG Road", "1 hr 5 min · 41 km · 7:42\u202Fpm ETA").timeLeft)
+        assertEquals("0 min", NavTextParser.parse("20 m", "Home", "0 min · 110 m · 18:53 ETA").timeLeft)
+        assertEquals("1 hr", NavTextParser.parse("1.2 km", "MG Road", "1 hr · 41 km · 7:42 pm ETA").timeLeft)
+        assertEquals("", NavTextParser.parse("300 m", "x", "2.6 km · 07:04 ETA").timeLeft)    // distances are not durations
+        assertEquals("", NavTextParser.parse("300 m", "x", "800 m · 07:04 ETA").timeLeft)
+        assertEquals("", NavTextParser.parse(null, null, null).timeLeft)
     }
 
     @Test fun survivesGarbage() {

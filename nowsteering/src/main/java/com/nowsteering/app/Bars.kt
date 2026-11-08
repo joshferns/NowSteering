@@ -5,7 +5,7 @@ import kotlin.math.roundToInt
 /** Progress bars from the two block glyphs the Honda renders: █ (done) and ▒ (to go). */
 object Bars {
     const val TURN_CELLS = 10
-    const val TRIP_CELLS = 5
+    const val TRIP_CELLS = 6
     const val TURN_BAR_FROM_M = 300.0
 
     fun bar(fraction: Double, cells: Int): String {
@@ -19,9 +19,12 @@ object Bars {
         return bar(1 - metersToTurn / TURN_BAR_FROM_M, TURN_CELLS)
     }
 
-    /** Trip progress from distance left vs. the longest distance left seen this trip. */
-    fun tripBar(metersLeft: Double?, tripMeters: Double?): String? {
+    /** Trip progress 0..1 from distance left vs. the longest distance left seen this trip. */
+    fun tripFraction(metersLeft: Double?, tripMeters: Double?): Double? {
         if (metersLeft == null || tripMeters == null || tripMeters <= 0) return null
-        return bar(1 - metersLeft / tripMeters, TRIP_CELLS)
+        return (1 - metersLeft / tripMeters).coerceIn(0.0, 1.0)
     }
+
+    fun tripBar(metersLeft: Double?, tripMeters: Double?): String? =
+        tripFraction(metersLeft, tripMeters)?.let { bar(it, TRIP_CELLS) }
 }

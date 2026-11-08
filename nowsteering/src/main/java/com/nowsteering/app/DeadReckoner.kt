@@ -68,6 +68,7 @@ class DeadReckoner(private val now: () -> Long) {
     /** GPS speed over the last [dtMs]; only counts while Maps is quiet and we're not paused. */
     fun onSpeed(mps: Double, dtMs: Long) {
         if (base == null) return
+        if (now() - baseAt > MAX_MS) return // Maps silent for 90 s: hold what we show, don't guess further
         if (hold && now() - lastMapsAt > HOLD_MAX_MS) hold = false // Maps went quiet while paused: carry on
         if (hold || now() - lastMapsAt < GAP_MS) return
         travelled += mps * dtMs / 1000.0
@@ -76,7 +77,6 @@ class DeadReckoner(private val now: () -> Long) {
     /** Meters to show, or null when there's nothing to estimate (no metric distance from Maps). */
     fun shown(): Double? {
         val b = base ?: return null
-        if (now() - baseAt > MAX_MS) return b
         return (b - travelled).coerceAtLeast(0.0)
     }
 

@@ -7,10 +7,14 @@ data class NavText(
     val eta: String,          // e.g. "19:42"
     val remaining: String,    // distance left, e.g. "6.1 km"
     val textGlyph: String?,   // maneuver from instruction words, if any
+    val timeLeft: String = "", // Maps' own trip duration, e.g. "7 min" or "1 hr 5 min"
 )
 
 object NavTextParser {
     private val distanceRe = Regex("""(\d+(?:[.,]\d+)?)\s?(km|m|mi|ft|yd)\b""", RegexOption.IGNORE_CASE)
+    // "7 min", "1 hr 5 min", "1 hr", "2 days 3 hr"; never matches distances ("800 m", "2.6 km").
+    private val durationRe = Regex(
+        """^(?:\d+\s?(?:days?|d|hrs?|h)(?:\s\d+\s?(?:min|mins|m))?|\d+\s?(?:min|mins))$""", RegexOption.IGNORE_CASE)
     private val timeRe = Regex("""\b(\d{1,2}[:.]\d{2})\s?([ap]\.?\s?m\.?)?""", RegexOption.IGNORE_CASE)
 
     /**
@@ -40,9 +44,10 @@ object NavTextParser {
         val etaPart = parts.firstOrNull { it.contains("ETA", true) || it.contains("arrival", true) } ?: parts.lastOrNull { timeRe.containsMatchIn(it) }
         val eta = etaPart?.let { p -> timeRe.find(p)?.let { m -> m.groupValues[1].replace('.', ':') + (m.groupValues[2].takeIf { it.isNotEmpty() }?.let { ap -> ap.filter { it.isLetter() }.lowercase() } ?: "") } } ?: ""
         val remaining = parts.firstNotNullOfOrNull { p -> distanceRe.find(p)?.let { fmtDistance(it) } } ?: ""
+        val timeLeft = parts.firstOrNull { durationRe.matches(it) } ?: ""
 
         val words = listOf(t, x, clean(bigText)).joinToString(" ").lowercase()
-        return NavText(distance, road, eta, remaining, glyphFromWords(words))
+        return NavText(distance, road, eta, remaining, glyphFromWords(words), timeLeft)
     }
 
     /**

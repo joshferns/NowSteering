@@ -55,6 +55,16 @@ class DeadReckonerTest {
         assertEquals(255.0, dr.shown()!!, 0.1)
     }
 
+    @Test fun holdsTheLastValueWhenMapsStaysSilent() {
+        // Seen on 7 Nov: after 90 s without a Maps update the display jumped back up to Maps' stale value.
+        maps(5000)
+        drive(100, 10.0)              // 90 s are counted, the last 10 s are not
+        val held = dr.shown()!!
+        assertTrue("held $held", held < 4500)  // still counting down, not reverted to 5000
+        drive(30, 10.0)
+        assertEquals(held, dr.shown()!!, 0.1)  // frozen, neither reverting nor guessing further
+    }
+
     @Test fun bigCorrectionJumpsToMaps() {
         maps(300)
         drive(10, 10.0)
