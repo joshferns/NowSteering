@@ -34,6 +34,10 @@ Then **Choose car** → pick the car (e.g. "Honda HFT") and leave *Start automat
   Previous = previous song. Pause (head unit) = pause/resume toggle. Forwarded to the music app that is playing.
 - **Music.** Never takes audio focus, so music keeps playing. While navigating, re-claims the car screen on each
   new instruction and ~1.5 s after a song change or skip; when not navigating, the music app's song info shows.
+- **Phase 2a (v0.3.0).** Nav far from a turn: line 2 = Maps' time left + trip bar, line 3 = the playing song (else the road).
+  Not navigating: notification button **Show on car**, triple-tap Next, and the setting **Keep Now Steering on screen**
+  (mirrors the playing title with a time-left bar). Decisions and the 5d answer: [docs/PHASE2A_NOTES.md](docs/PHASE2A_NOTES.md).
+  Tests: [parked](docs/PHASE2A_PARKED_TEST.md), [drive](docs/PHASE2A_DRIVE_TEST.md).
 - **Progress bars** (settings, both on): turn bar `█████▒▒▒▒▒` replaces the ETA line in the last 300 m before a turn;
   trip bar `ETA 09:45 ███▒▒` shows overall trip progress.
 - **Arrival.** `● Arrived` as soon as Maps shows its destination marker within 30 m. It stays until the car
@@ -49,6 +53,7 @@ Then **Choose car** → pick the car (e.g. "Honda HFT") and leave *Start automat
   event log with Share / Copy / Clear / Add note.
 
 Code: `nowsteering/src/main/java/com/nowsteering/app/` (app), `app/` (probe).
+Releases are named by version: bump the one-line `VERSION` file for each release (the tag is `v<VERSION>`).
 Build locally: `./gradlew :nowsteering:assembleDebug :nowsteering:testDebugUnitTest`.
 
 Test scripts: [Phase 1 in-car test](docs/PHASE1_TEST_SCRIPT.md) · [Phase 0 session 2](docs/SESSION2_TEST_SCRIPT.md).
