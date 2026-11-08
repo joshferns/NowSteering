@@ -7,6 +7,7 @@ on:
       - "nowsteering/**"
       - "gradle/**"
       - "*.gradle.kts"
+      - "VERSION"
       - ".github/workflows/apks.yml"
   workflow_dispatch:
 
@@ -26,6 +27,10 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v4
 
+      - name: Read version
+        id: ver
+        run: echo "v=$(tr -d '[:space:]' < VERSION)" >> "$GITHUB_OUTPUT"
+
       - name: Unit tests
         run: ./gradlew :nowsteering:testDebugUnitTest --no-daemon
 
@@ -42,17 +47,17 @@ jobs:
           name: apks
           path: "*.apk"
 
-      # Each build is its own release; "latest" always points at the newest one, so the phone links
-      # .../releases/latest/download/NowSteering.apk and .../NowSteering-probe.apk never change.
+      # Each version is its own release (tag v<VERSION>); "latest" always points at the newest one, so the
+      # phone links .../releases/latest/download/NowSteering.apk and .../NowSteering-probe.apk never change.
       - name: Publish release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: build-${{ github.run_number }}
-          name: Build ${{ github.run_number }} (${{ github.ref_name }})
+          tag_name: v${{ steps.ver.outputs.v }}
+          name: Now Steering v${{ steps.ver.outputs.v }}
           target_commitish: ${{ github.sha }}
           body: |
-            NowSteering.apk (the app) and NowSteering-probe.apk (Phase 0 probe), commit ${{ github.sha }}.
-            Both install over their previous builds (same signing key).
+            Now Steering v${{ steps.ver.outputs.v }} (NowSteering.apk) and the Phase 0 probe (NowSteering-probe.apk),
+            commit ${{ github.sha }}. Both install over their previous builds (same signing key).
           files: |
             NowSteering.apk
             NowSteering-probe.apk

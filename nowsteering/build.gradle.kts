@@ -19,7 +19,8 @@ android {
         minSdk = 33
         targetSdk = 35
         versionCode = runNumber
-        versionName = "0.2.$runNumber"
+        // The release version lives in /VERSION (one line). Bump it for every release; the tag is v<VERSION>.
+        versionName = rootProject.file("VERSION").readText().trim()
         buildConfigField("String", "GIT_SHA", "\"$gitSha\"")
         buildConfigField("String", "BUILD_TIME", "\"$buildTime\"")
     }
