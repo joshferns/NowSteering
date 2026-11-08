@@ -9,6 +9,7 @@ import android.media.session.MediaSessionManager
 import android.media.session.PlaybackState
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 
 /** Lists active media sessions (needs notification-listener access), logs changes, picks the music app to forward to. */
 class SessionWatcher(private val ctx: Context) {
@@ -28,6 +29,9 @@ class SessionWatcher(private val ctx: Context) {
 
     /** A music app changed song (it may have taken the car screen). */
     var onSongChange: ((String) -> Unit)? = null
+
+    /** Another app started (or resumed) playing: it is now the app the car follows, until we re-claim. */
+    var onOtherStartedPlaying: ((String) -> Unit)? = null
 
     private val changed = MediaSessionManager.OnActiveSessionsChangedListener { list -> update(list ?: emptyList()) }
 
@@ -50,6 +54,33 @@ class SessionWatcher(private val ctx: Context) {
     }
 
     private fun isMusic(c: MediaController) = c.packageName != ctx.packageName && c.packageName != "com.android.server.telecom"
+
+    /** A browser tab's media session ("Stories • Instagram") is not a song. */
+    private fun isSongSource(c: MediaController) = isMusic(c) && c.packageName !in BROWSERS
+
+    private fun isActive(state: Int?) = state == PlaybackState.STATE_PLAYING || state == PlaybackState.STATE_BUFFERING
+
+    /** Is some app other than us playing right now (it would hold the car's screen and buttons)? */
+    fun otherIsPlaying() = controllers.any { isMusic(it) && isActive(it.playbackState?.state) }
+
+    /** What the car's owner is listening to right now. */
+    data class Song(val pkg: String, val title: String, val artist: String, val durationMs: Long, val positionMs: Long?)
+
+    fun song(): Song? {
+        val c = controllers.firstOrNull { isSongSource(it) && isActive(it.playbackState?.state) } ?: return null
+        val md = c.metadata ?: return null
+        val title = md.getString(MediaMetadata.METADATA_KEY_TITLE)?.trim().orEmpty()
+        if (title.isEmpty()) return null
+        val ps = c.playbackState
+        var pos: Long? = null
+        if (ps != null && ps.position >= 0) {
+            val advance = if (ps.state == PlaybackState.STATE_PLAYING)
+                ((SystemClock.elapsedRealtime() - ps.lastPositionUpdateTime) * ps.playbackSpeed).toLong().coerceAtLeast(0) else 0L
+            pos = ps.position + advance
+        }
+        return Song(c.packageName, title, md.getString(MediaMetadata.METADATA_KEY_ARTIST)?.trim().orEmpty(),
+            md.getLong(MediaMetadata.METADATA_KEY_DURATION), pos)
+    }
 
     private fun update(list: List<MediaController>) {
         val tokens = list.map { it.sessionToken }.toSet()
@@ -81,6 +112,7 @@ class SessionWatcher(private val ctx: Context) {
             lastState[c.sessionToken] = s
             NsLog.log("SESSIONS", "${short(c.packageName)} state -> ${stateName(s)}")
             if (isMusic(c) && s == PlaybackState.STATE_PLAYING) lastPlayingPackage = c.packageName
+            if (isMusic(c) && isActive(s)) onOtherStartedPlaying?.invoke(c.packageName)
             refresh()
         }
 
@@ -124,6 +156,9 @@ class SessionWatcher(private val ctx: Context) {
     }
 
     companion object {
+        private val BROWSERS = setOf("com.android.chrome", "com.sec.android.app.sbrowser", "org.mozilla.firefox",
+            "com.brave.browser", "com.microsoft.emmx", "com.opera.browser")
+
         fun short(pkg: String) = when (pkg) {
             "com.google.android.apps.youtube.music" -> "YTMusic"
             "com.nowsteering.app" -> "US"

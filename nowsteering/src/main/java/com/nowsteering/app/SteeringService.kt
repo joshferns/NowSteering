@@ -42,6 +42,10 @@ class SteeringService : Service() {
         private const val CHANNEL = "ns"
         private const val NOTIF_ID = 1
         private const val REGRAB_MIN_INTERVAL_MS = 10_000L
+        const val ACTION_SHOW_ON_CAR = "com.nowsteering.app.SHOW_ON_CAR"
+        private const val CLAIM_DELAY_MS = 1500L      // let the other app finish starting its player first
+        private const val CLAIM_MIN_GAP_MS = 2000L    // never more than one automatic claim per 2 s
+        private const val CLAIM_MAX_PER_30S = 4       // ... and back off if something keeps taking it back
         private const val ACTIONS = PlaybackState.ACTION_PLAY or PlaybackState.ACTION_PAUSE or
             PlaybackState.ACTION_PLAY_PAUSE or PlaybackState.ACTION_SKIP_TO_NEXT or PlaybackState.ACTION_SKIP_TO_PREVIOUS
 
@@ -78,6 +82,10 @@ class SteeringService : Service() {
     private var track: AudioTrack? = null
     private var lastRegrab = 0L
     private var lastInstruction: String? = null
+    private var lastKeyAt = 0L // when a media button last reached us (it only does while we hold the car)
+    private val zone = TurnZone()
+    private var heldSong: SessionWatcher.Song? = null
+    private var heldSongAt = 0L
 
     var mode = Mode.AUTO
         private set
@@ -125,13 +133,15 @@ class SteeringService : Service() {
         buttons = Buttons(
             onNext = { forward("next") { it.skipToNext() } },
             onDoubleNext = { toggleNavIdle() },
+            onTripleNext = { claimNow("triple-tap Next") },
             onPrevious = { forward("previous") { it.skipToPrevious() } },
             onPlayPause = { k -> togglePlayback(k) },
         )
         startForegroundNow()
         callGuard = CallGuard(audio, ::stepAside, ::comeBack)
         NavState.listener = { info -> main.post { onNav(info) } }
-        NsApp.watcher.onSongChange = { pkg -> reclaimSoon("song change in ${SessionWatcher.short(pkg)}") }
+        NsApp.watcher.onSongChange = { pkg -> claimSoon("song change in ${SessionWatcher.short(pkg)}") }
+        NsApp.watcher.onOtherStartedPlaying = { pkg -> claimSoon("${SessionWatcher.short(pkg)} started playing") }
         startLocation()
         // Keep the CPU running with the screen off; only held while the car is connected.
         wakeLock = getSystemService(android.os.PowerManager::class.java)
@@ -152,7 +162,10 @@ class SteeringService : Service() {
         main.post(ticker)
     }
 
-    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int) = START_NOT_STICKY
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        if (intent?.action == ACTION_SHOW_ON_CAR) claimNow("notification button")
+        return START_NOT_STICKY
+    }
 
     override fun onDestroy() {
         main.removeCallbacks(ticker)
@@ -162,7 +175,8 @@ class SteeringService : Service() {
         callGuard.stop()
         NavState.listener = null
         NsApp.watcher.onSongChange = null
-        main.removeCallbacks(reclaim)
+        NsApp.watcher.onOtherStartedPlaying = null
+        main.removeCallbacks(claim)
         stopLocation()
         stopSilence()
         session.isActive = false
@@ -178,11 +192,15 @@ class SteeringService : Service() {
         val nm = getSystemService(NotificationManager::class.java)
         nm.createNotificationChannel(NotificationChannel(CHANNEL, "Now Steering", NotificationManager.IMPORTANCE_LOW))
         val open = PendingIntent.getActivity(this, 0, Intent(this, MainActivity::class.java), PendingIntent.FLAG_IMMUTABLE)
+        val show = PendingIntent.getService(this, 1,
+            Intent(this, SteeringService::class.java).setAction(ACTION_SHOW_ON_CAR), PendingIntent.FLAG_IMMUTABLE)
         val n = Notification.Builder(this, CHANNEL)
             .setSmallIcon(android.R.drawable.ic_menu_directions)
             .setContentTitle("Now Steering is on")
             .setContentText("Showing nav / clock on the car screen")
             .setContentIntent(open)
+            .addAction(Notification.Action.Builder(
+                android.graphics.drawable.Icon.createWithResource(this, android.R.drawable.ic_menu_view), "Show on car", show).build())
             .setOngoing(true)
             .build()
         var type = ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK
@@ -281,21 +299,72 @@ class SteeringService : Service() {
         NsLog.log("SCREEN", "sent $s${if (style != RefreshStyle.METADATA_ONLY) " [${style.name}]" else ""}")
     }
 
-    private var reclaimWhy = ""
-    private val reclaim = Runnable {
-        if (NavState.active) regrab(reclaimWhy, force = true)
-        else NsLog.log("SESSION", "no re-claim after $reclaimWhy: not navigating, music info stays on the car")
-    }
+    // ---- Re-claiming the car ----
+    // Android 13 sends both the car's "now playing" screen and the steering-wheel buttons to the app that
+    // most recently STARTED playing audio. Restarting our own silent audio (re-grab) puts us back in front.
 
-    /** While navigating, take the car screen back ~1.5 s after the music app changes song. */
-    private fun reclaimSoon(why: String) {
-        if (!NavState.active) {
-            NsLog.log("SESSION", "no re-claim after $why: not navigating, music info stays on the car")
+    private var claimWhy = ""
+    private var claimEvents = 0
+    private var claimPending = false
+    private var lastClaimAt = 0L
+    private val claimTimes = ArrayDeque<Long>()
+    private val claim = Runnable { runClaim() }
+
+    private fun keyAgo() = if (lastKeyAt == 0L) "never" else "${(SystemClock.elapsedRealtime() - lastKeyAt) / 1000} s ago"
+
+    /**
+     * Another app may have taken the car. While navigating, or with "Keep Now Steering on screen" on, take it back
+     * ~1.5 s later (a burst of events becomes one claim), at most once per 2 s and 4 per 30 s.
+     */
+    private fun claimSoon(why: String) {
+        if (!NavState.active && !Prefs.keepOnScreen) {
+            NsLog.log("CLAIM", "no re-claim after $why: not navigating and 'Keep on screen' is off, music info stays on the car; last button to us ${keyAgo()}")
             return
         }
-        reclaimWhy = why
-        main.removeCallbacks(reclaim) // music apps send several updates per song change: one re-claim
-        main.postDelayed(reclaim, 1500)
+        if (callGuard.inCall) return
+        if (claimPending) { claimEvents++; return }
+        claimPending = true
+        claimWhy = why
+        claimEvents = 1
+        val wait = maxOf(CLAIM_DELAY_MS, lastClaimAt + CLAIM_MIN_GAP_MS - SystemClock.elapsedRealtime())
+        NsLog.log("CLAIM", "$why: re-claim in $wait ms; last button to us ${keyAgo()}")
+        main.postDelayed(claim, wait)
+    }
+
+    private fun runClaim() {
+        claimPending = false
+        val extra = if (claimEvents > 1) " (+${claimEvents - 1} more events)" else ""
+        if (callGuard.inCall) { NsLog.log("CLAIM", "skipped: on a call"); return }
+        if (!NavState.active && !Prefs.keepOnScreen) { NsLog.log("CLAIM", "skipped: setting turned off"); return }
+        if (!NavState.active && !NsApp.watcher.otherIsPlaying()) {
+            NsLog.log("CLAIM", "skipped: no other app is playing now (${claimWhy}$extra)")
+            return
+        }
+        val now = SystemClock.elapsedRealtime()
+        while (claimTimes.isNotEmpty() && now - claimTimes.first() > 30_000) claimTimes.removeFirst()
+        if (claimTimes.size >= CLAIM_MAX_PER_30S) {
+            NsLog.log("CLAIM", "limiter: ${claimTimes.size} claims in 30 s, something keeps taking it back; waiting 10 s")
+            main.postDelayed({ claimSoon("retry after limiter") }, 10_000)
+            return
+        }
+        claimTimes.addLast(now)
+        lastClaimAt = now
+        regrab("$claimWhy$extra", force = true)
+        NsLog.log("CLAIM", "done: ${engine.current ?: "(nothing sent yet)"}; last button to us ${keyAgo()}")
+    }
+
+    /** The user asked (triple-tap Next, notification button): claim straight away. */
+    fun claimNow(why: String) {
+        if (callGuard.inCall) { NsLog.log("CLAIM", "$why: ignored, on a call"); return }
+        NsLog.log("CLAIM", "$why: re-claiming now; last button to us ${keyAgo()}")
+        lastClaimAt = SystemClock.elapsedRealtime()
+        regrab(why, force = true)
+    }
+
+    /** "Keep Now Steering on screen" was switched. */
+    fun onKeepChanged(on: Boolean) {
+        NsLog.log("CLAIM", "keep on screen = $on")
+        if (on) claimSoon("setting turned on")
     }
 
     /** Restart our silent track so Android ranks our session on top again. */
@@ -336,6 +405,7 @@ class SteeringService : Service() {
     private fun onNav(info: NavState.Info?) {
         if (info == null) {
             lastInstruction = null
+            zone.reset()
             dr.reset()
             tripMeters = null
             shownNav = null
@@ -403,6 +473,7 @@ class SteeringService : Service() {
         if (info.instructionId != lastInstruction) {
             val first = lastInstruction == null
             lastInstruction = info.instructionId
+            zone.reset()
             regrab(if (first) "navigation started" else "new instruction", force = first)
         }
         refreshScreen()
@@ -474,6 +545,10 @@ class SteeringService : Service() {
         engine.show(s, force)
     }
 
+    /**
+     * Nav screen. Line 1: arrow + distance to the turn. Far from the turn: line 2 = time left + trip bar,
+     * line 3 = the song that is playing (else the road). Last 300 m: line 2 = turn bar, line 3 = Maps' road text.
+     */
     private fun navScreen(i: NavState.Info): Screen {
         val t = i.text
         // A real reroute: say so until Maps sends the new instruction.
@@ -481,15 +556,18 @@ class SteeringService : Service() {
         val toTurn = dr.shown()
         val distance = toTurn?.let { NavTextParser.formatMeters(it) } ?: t.distance
         val title = "${i.glyph} $distance".trim()
-        val turnBar = if (Prefs.turnBar) Bars.turnBar(toTurn) else null
-        val tripBar = if (Prefs.tripBar) Bars.tripBar(NavTextParser.metersOf(t.remaining), tripMeters) else null
-        val eta = t.eta.takeIf { it.isNotEmpty() }?.let { "ETA $it" }
-        val album = when {
-            turnBar != null -> "${i.glyph} $turnBar" // last 300 m before the turn, led by its arrow
-            tripBar != null && eta != null -> "$eta $tripBar"
-            else -> listOfNotNull(eta, t.remaining.replace(" ", "").takeIf { it.isNotEmpty() }).joinToString(" ")
+        val near = zone.update(toTurn)
+        val prefix = Prefs.songPrefix
+
+        val line2 = if (near && Prefs.turnBar) {
+            "${i.glyph} ${Bars.turnBar(minOf(toTurn!!, Bars.TURN_BAR_FROM_M))}"
+        } else {
+            Layouts.farLine2(t.timeLeft, t.remaining, t.eta, Bars.tripFraction(NavTextParser.metersOf(t.remaining), tripMeters),
+                showArrival = Prefs.arrivalTime, showBar = Prefs.tripBar)
         }
-        return Screen(title, t.road, album)
+        val song = if (near) null else currentSong()?.let { Layouts.songText(it.title, it.artist, prefix) }
+        return Screen.lines(title, line2, song ?: t.road,
+            line2Max = 20, line3Max = if (song != null) Glyphs.SONG_MAX else Glyphs.LINE_MAX, extra = prefix.extra)
     }
 
     private val clockFmt = SimpleDateFormat("HH:mm", Locale.US)
@@ -502,7 +580,27 @@ class SteeringService : Service() {
         val speed = if (fresh) "$speedKmh" else "--"
         // With seconds (lock-screen refresh test) the title is 15 chars: "08:41:23 35km/h".
         val title = if (Prefs.idleSeconds) "${secFmt.format(now)} ${speed}km/h" else "${clockFmt.format(now)}  $speed km/h"
+        if (Prefs.keepOnScreen) mirrorScreen(title)?.let { return it }
         return Screen(title, dateFmt.format(now), "Now Steering")
+    }
+
+    /**
+     * What is playing, held for 4 s when a music app briefly reports nothing between songs
+     * (it sends empty titles mid-change), so the line does not flick to the road and back.
+     */
+    private fun currentSong(): SessionWatcher.Song? {
+        val now = SystemClock.elapsedRealtime()
+        NsApp.watcher.song()?.let { heldSong = it; heldSongAt = now; return it }
+        return heldSong?.takeIf { now - heldSongAt < 4000 }
+    }
+
+    /** "Keep Now Steering on screen", not navigating: clock + speed, the playing title, and a time-left bar. */
+    private fun mirrorScreen(title: String): Screen? {
+        val song = currentSong() ?: return null
+        if (Glyphs.sanitize(song.title, 40).count { it.isLetterOrDigit() } < 2) return null
+        val artist = Glyphs.sanitize(song.artist, 40)
+        return Screen.lines(title, "▶ ${song.title}", Layouts.mirrorLine3(song.durationMs, song.positionMs, artist),
+            line2Max = Glyphs.SONG_MAX, line3Max = Glyphs.SONG_MAX)
     }
 
     private val ticker = object : Runnable {
@@ -597,7 +695,7 @@ class SteeringService : Service() {
         val before = "${SessionWatcher.stateName(t.playbackState?.state)} ${SessionWatcher.describe(t.metadata)}"
         action(t.transportControls)
         NsLog.log("FWD", "$what -> ${t.packageName} (before: $before)")
-        if (what == "next" || what == "previous") reclaimSoon("forwarded $what")
+        if (what == "next" || what == "previous") claimSoon("forwarded $what")
         // Check a moment later whether the music app actually reacted.
         main.postDelayed({
             NsLog.log("FWD", "$what check: ${t.packageName} now ${SessionWatcher.stateName(t.playbackState?.state)} ${SessionWatcher.describe(t.metadata)}")
@@ -617,16 +715,17 @@ class SteeringService : Service() {
                 NsLog.log("KEY", "media button intent without KeyEvent")
                 return super.onMediaButtonEvent(intent)
             }
+            lastKeyAt = SystemClock.elapsedRealtime()
             val action = if (ke.action == KeyEvent.ACTION_DOWN) "DOWN" else if (ke.action == KeyEvent.ACTION_UP) "UP" else "action${ke.action}"
             NsLog.log("KEY", "${KeyEvent.keyCodeToString(ke.keyCode)} (${ke.keyCode}) $action repeat=${ke.repeatCount}")
             return buttons.onKey(ke) || super.onMediaButtonEvent(intent)
         }
 
         // Only reached for commands that arrive without a KeyEvent.
-        override fun onSkipToNext() { NsLog.log("KEY", "onSkipToNext without KeyEvent"); buttons.nextTap() }
-        override fun onSkipToPrevious() { NsLog.log("KEY", "onSkipToPrevious without KeyEvent"); buttons.previous() }
-        override fun onPause() { NsLog.log("KEY", "onPause without KeyEvent"); buttons.playPause("PAUSE") }
-        override fun onPlay() { NsLog.log("KEY", "onPlay without KeyEvent"); buttons.playPause("PLAY") }
+        override fun onSkipToNext() { lastKeyAt = SystemClock.elapsedRealtime(); NsLog.log("KEY", "onSkipToNext without KeyEvent"); buttons.nextTap() }
+        override fun onSkipToPrevious() { lastKeyAt = SystemClock.elapsedRealtime(); NsLog.log("KEY", "onSkipToPrevious without KeyEvent"); buttons.previous() }
+        override fun onPause() { lastKeyAt = SystemClock.elapsedRealtime(); NsLog.log("KEY", "onPause without KeyEvent"); buttons.playPause("PAUSE") }
+        override fun onPlay() { lastKeyAt = SystemClock.elapsedRealtime(); NsLog.log("KEY", "onPlay without KeyEvent"); buttons.playPause("PLAY") }
         override fun onStop() { NsLog.log("KEY", "onStop without KeyEvent (ignored)") }
     }
 }

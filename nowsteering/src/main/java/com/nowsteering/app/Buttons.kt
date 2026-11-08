@@ -10,11 +10,12 @@ import java.util.Locale
 /**
  * Steering buttons. The Honda sends an instant DOWN+UP per press and never sends holds or PLAY,
  * so we act on DOWN only. Next waits [Prefs.tapWindowMs] to count taps (single = forward next,
- * double = switch nav/idle screen); Previous and Pause act immediately.
+ * double = switch nav/idle screen, triple = re-claim the car); Previous and Pause act immediately.
  */
 class Buttons(
     private val onNext: () -> Unit,
     private val onDoubleNext: () -> Unit,
+    private val onTripleNext: () -> Unit,
     private val onPrevious: () -> Unit,
     private val onPlayPause: (String) -> Unit,
 ) {
@@ -32,6 +33,7 @@ class Buttons(
         when (n) {
             1 -> gesture("NEXT single") { onNext() }
             2 -> gesture("NEXT double") { onDoubleNext() }
+            3 -> gesture("NEXT triple") { onTripleNext() }
             else -> gesture("NEXT x$n (ignored)") {}
         }
     }

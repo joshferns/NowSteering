@@ -47,6 +47,21 @@ object Prefs {
         get() = sp.getBoolean("tripBar", true)
         set(v) = sp.edit().putBoolean("tripBar", v).apply()
 
+    /** Re-claim the car (screen + wheel buttons) whenever another app starts playing. Off by default. */
+    var keepOnScreen: Boolean
+        get() = sp.getBoolean("keepOnScreen", false)
+        set(v) = sp.edit().putBoolean("keepOnScreen", v).apply()
+
+    /** Arrival clock on line 2 while far from a turn (replaces the trip bar there). Off until the width test passes. */
+    var arrivalTime: Boolean
+        get() = sp.getBoolean("arrivalTime", false)
+        set(v) = sp.edit().putBoolean("arrivalTime", v).apply()
+
+    /** Glyph before the song on the nav screen. None until ♪ has been checked on the car. */
+    var songPrefix: SongPrefix
+        get() = SongPrefix.of(sp.getString("songPrefix", null))
+        set(v) = sp.edit().putString("songPrefix", v.name).apply()
+
     /** Icon signatures already written to the log, so each new Maps icon is logged once. */
     var seenIcons: Set<String>
         get() = sp.getStringSet("seenIcons", emptySet()) ?: emptySet()
