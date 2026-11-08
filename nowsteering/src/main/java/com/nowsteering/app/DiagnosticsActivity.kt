@@ -39,12 +39,40 @@ class DiagnosticsActivity : BaseActivity() {
         navView = mono(12f)
 
         section("Text tester (sent through the display engine)")
-        listOf("Title (15)", "Artist (18)", "Album (18)").forEach { addField(it) }
+        note("Tester limits are the car's measured widths: 17 / 20 / 20, and ♪ ♫ are let through so they can be checked.")
+        // Top to bottom on the car: Title (big line), Album (disc icon), Artist (person icon).
+        listOf("Title (big line, 17)", "Album (disc icon, 20)", "Artist (person icon, 20)").forEach { addField(it) }
         row(button("Show on car") {
             val s = SteeringService.instance ?: return@button toast("Service is off")
-            s.showTest(Screen(inputs[0].text.toString(), inputs[1].text.toString(), inputs[2].text.toString()))
+            s.showTest(Screen(inputs[0].text.toString(), artist = inputs[2].text.toString(), album = inputs[1].text.toString(),
+                titleMax = 17, artistMax = 20, albumMax = 20, extra = "♪♫"))
         }, button("Back to live") { SteeringService.instance?.backToLive() },
             button("Re-grab") { SteeringService.instance?.regrab("Diagnostics button", force = true) })
+
+        section("Car test screens (one tap each)")
+        Presets.testScreens.chunked(2).forEach { pair ->
+            row(*pair.map { (name, screen) ->
+                button(name) {
+                    val svc = SteeringService.instance ?: return@button toast("Service is off")
+                    svc.showTest(screen)
+                }
+            }.toTypedArray())
+        }
+        row(button("Back to live") { SteeringService.instance?.backToLive() })
+
+        section("Song on the nav screen")
+        note("Glyph before the song name. Keep 'none' until ♪ has been seen working on the car.")
+        val prefixSpinner = Spinner(this)
+        prefixSpinner.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, SongPrefix.entries.map { it.label })
+        prefixSpinner.setSelection(Prefs.songPrefix.ordinal)
+        prefixSpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(p: AdapterView<*>?, v: View?, pos: Int, id: Long) {
+                val sel = SongPrefix.entries[pos]
+                if (sel != Prefs.songPrefix) { Prefs.songPrefix = sel; NsLog.log("UI", "song prefix = ${sel.name}") }
+            }
+            override fun onNothingSelected(p: AdapterView<*>?) {}
+        }
+        root.addView(prefixSpinner)
 
         section("Car refresh (phone-locked test)")
         root.addView(android.widget.CheckBox(this).apply {
@@ -82,6 +110,7 @@ class DiagnosticsActivity : BaseActivity() {
             val t = note.text.toString().trim()
             if (t.isNotEmpty()) { NsLog.log("NOTE", t); note.setText("") }
         })
+        row(button("Share key lines") { shareKeyLines() })
         row(button("Share text") { shareText() }, button("Share file") { shareFile() },
             button("Copy") { copyLog() }, button("Clear") { confirmClear() })
         logView = mono(11f).apply { setTextIsSelectable(true) }
@@ -135,10 +164,36 @@ class DiagnosticsActivity : BaseActivity() {
 
     private fun fullLog() = NsApp.instance.header() + NsLog.fileText()
 
+    /**
+     * Only the lines that show who held the car and whether the buttons reached us: buttons, gestures, forwards,
+     * claims, session changes, and the mirror screens. Repeated metadata lines are collapsed.
+     */
+    private fun shareKeyLines() {
+        val keep = Regex("""\[(KEY|GESTURE|FWD|CLAIM|SESSION|SESSIONS|UI|NOTE|CALL)\]""")
+        val kept = ArrayList<String>()
+        var lastBody = ""
+        for (line in NsLog.fileText().lineSequence()) {
+            val isMirror = line.contains("[SCREEN]") && (line.contains("▶") || line.contains("♪"))
+            if (!isMirror && !keep.containsMatchIn(line)) continue
+            val body = line.substringAfter("] ", line)
+            if (body == lastBody) continue
+            lastBody = body
+            kept.add(line)
+        }
+        var text = NsApp.instance.header() + "[key lines only: ${kept.size} of the log]\n" + kept.joinToString("\n")
+        val limit = 200_000
+        if (text.length > limit) text = NsApp.instance.header() + "[truncated]\n" + text.takeLast(limit)
+        sendText(text)
+    }
+
     private fun shareText() {
         var text = fullLog()
         val limit = 200_000
         if (text.length > limit) text = NsApp.instance.header() + "[truncated to the last $limit chars; use Share file]\n" + text.takeLast(limit)
+        sendText(text)
+    }
+
+    private fun sendText(text: String) {
         startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).apply {
             type = "text/plain"
             putExtra(Intent.EXTRA_SUBJECT, "Now Steering log")

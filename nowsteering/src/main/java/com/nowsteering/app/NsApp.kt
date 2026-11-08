@@ -73,6 +73,7 @@ class NsApp : Application() {
         appendLine("App: ${BuildConfig.VERSION_NAME} code ${BuildConfig.VERSION_CODE} git ${BuildConfig.GIT_SHA} built ${BuildConfig.BUILD_TIME}")
         appendLine("Perms: ${permSummary()}")
         appendLine("Car: ${Prefs.carName} ${Prefs.carAddress} autoStart=${Prefs.autoStart} tapWindow=${Prefs.tapWindowMs}ms")
+        appendLine("Display: keepOnScreen=${Prefs.keepOnScreen} arrivalTime=${Prefs.arrivalTime} songPrefix=${Prefs.songPrefix} turnBar=${Prefs.turnBar} tripBar=${Prefs.tripBar}")
         appendLine("Service running: ${SteeringService.instance != null}, navigating: ${NavState.active}, known icons: ${KnownIcons.list.size}, seen icons: ${Prefs.seenIcons.size}")
         appendLine("==========================")
     }

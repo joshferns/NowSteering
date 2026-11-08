@@ -51,6 +51,20 @@ class MainActivity : BaseActivity() {
             isChecked = Prefs.tripBar
             setOnCheckedChangeListener { _, b -> Prefs.tripBar = b; NsLog.log("UI", "trip bar = $b") }
         })
+        root.addView(CheckBox(this).apply {
+            text = "Arrival time on line 2 (replaces the trip bar)"
+            isChecked = Prefs.arrivalTime
+            setOnCheckedChangeListener { _, b -> Prefs.arrivalTime = b; NsLog.log("UI", "arrival time = $b") }
+        })
+        root.addView(CheckBox(this).apply {
+            text = "Keep Now Steering on screen (take the car back when another app plays)"
+            isChecked = Prefs.keepOnScreen
+            setOnCheckedChangeListener { _, b ->
+                Prefs.keepOnScreen = b
+                NsLog.log("UI", "keep on screen = $b")
+                SteeringService.instance?.onKeepChanged(b)
+            }
+        })
         row(button("Start now") { SteeringService.start(this, "Start tapped") },
             button("Stop") { SteeringService.stop(this, "Stop tapped") })
 

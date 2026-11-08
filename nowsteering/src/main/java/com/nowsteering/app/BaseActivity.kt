@@ -34,6 +34,11 @@ abstract class BaseActivity : Activity() {
         })
     }
 
+    protected fun note(text: String) = TextView(this).apply {
+        this.text = text
+        textSize = 13f
+    }.also { root.addView(it) }
+
     protected fun mono(size: Float = 12f) = TextView(this).apply {
         textSize = size
         typeface = Typeface.MONOSPACE
