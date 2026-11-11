@@ -62,17 +62,18 @@ class DiagnosticsActivity : BaseActivity() {
 
         section("Song on the nav screen")
         note("Glyph before the song name. ▶ is proven on the car; ♪ and ♫ show as dots.")
-        val prefixSpinner = Spinner(this)
-        prefixSpinner.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, SongPrefix.entries.map { it.label })
-        prefixSpinner.setSelection(Prefs.songPrefix.ordinal)
-        prefixSpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
-            override fun onItemSelected(p: AdapterView<*>?, v: View?, pos: Int, id: Long) {
-                val sel = SongPrefix.entries[pos]
-                if (sel != Prefs.songPrefix) { Prefs.songPrefix = sel; NsLog.log("UI", "song prefix = ${sel.name}") }
-            }
-            override fun onNothingSelected(p: AdapterView<*>?) {}
+        val prefixGroup = android.widget.RadioGroup(this)
+        SongPrefix.entries.forEach { sp ->
+            prefixGroup.addView(android.widget.RadioButton(this).apply {
+                id = View.generateViewId()
+                text = sp.label
+                isChecked = sp == Prefs.songPrefix
+                setOnCheckedChangeListener { _, b ->
+                    if (b && sp != Prefs.songPrefix) { Prefs.songPrefix = sp; NsLog.log("UI", "song prefix = ${sp.name}") }
+                }
+            })
         }
-        root.addView(prefixSpinner)
+        root.addView(prefixGroup)
 
         section("Car refresh (phone-locked test)")
         root.addView(android.widget.CheckBox(this).apply {
@@ -120,14 +121,17 @@ class DiagnosticsActivity : BaseActivity() {
         val input = EditText(this).apply { hint = label; isSingleLine = true }
         inputs.add(input)
         val spinner = Spinner(this)
-        spinner.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, listOf("preset…") + Presets.list.map { it.first })
+        // Closed view = simple_spinner_item; only the open list uses the dropdown-row layout.
+        spinner.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_item, listOf("preset…") + Presets.list.map { it.first })
+            .also { it.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item) }
         spinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
             override fun onItemSelected(p: AdapterView<*>?, v: View?, pos: Int, id: Long) {
                 if (pos > 0) { input.setText(Presets.list[pos - 1].second); spinner.setSelection(0) }
             }
             override fun onNothingSelected(p: AdapterView<*>?) {}
         }
-        row(input, spinner)
+        root.addView(input)    // full width, so the hint is not cut in half
+        root.addView(spinner)  // full width below it
     }
 
     override fun onResume() {
