@@ -39,13 +39,13 @@ class DiagnosticsActivity : BaseActivity() {
         navView = mono(12f)
 
         section("Text tester (sent through the display engine)")
-        note("Tester limits are the car's measured widths: 17 / 20 / 20, and ♪ ♫ are let through so they can be checked.")
+        note("Tester limits are the car's measured widths: 17 / 20 / 20, and the candidate glyphs ♪ ♫ ♩ ♬ … are let through so they can be checked.")
         // Top to bottom on the car: Title (big line), Album (disc icon), Artist (person icon).
         listOf("Title (big line, 17)", "Album (disc icon, 20)", "Artist (person icon, 20)").forEach { addField(it) }
         row(button("Show on car") {
             val s = SteeringService.instance ?: return@button toast("Service is off")
             s.showTest(Screen(inputs[0].text.toString(), artist = inputs[2].text.toString(), album = inputs[1].text.toString(),
-                titleMax = 17, artistMax = 20, albumMax = 20, extra = "♪♫"))
+                titleMax = 17, artistMax = 20, albumMax = 20, extra = Glyphs.TEST_EXTRA))
         }, button("Back to live") { SteeringService.instance?.backToLive() },
             button("Re-grab") { SteeringService.instance?.regrab("Diagnostics button", force = true) })
 
@@ -61,7 +61,7 @@ class DiagnosticsActivity : BaseActivity() {
         row(button("Back to live") { SteeringService.instance?.backToLive() })
 
         section("Song on the nav screen")
-        note("Glyph before the song name. Keep 'none' until ♪ has been seen working on the car.")
+        note("Glyph before the song name. ▶ is proven on the car; ♪ and ♫ show as dots.")
         val prefixSpinner = Spinner(this)
         prefixSpinner.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, SongPrefix.entries.map { it.label })
         prefixSpinner.setSelection(Prefs.songPrefix.ordinal)

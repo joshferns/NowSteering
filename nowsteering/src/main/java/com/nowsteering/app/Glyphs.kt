@@ -6,6 +6,8 @@ import java.text.Normalizer
 object Glyphs {
     const val TITLE_MAX = 15
     const val LINE_MAX = 18
+    /** Glyphs the test screens and the free-form tester let through, to see which the car draws as a real symbol. */
+    const val TEST_EXTRA = "♪♫♩♬♭♯♠♣♥♦☼♀♂○◊"
     /** Song line: the car measured 20 characters for artist/album in Phase 0 (the parked width test re-checks it). */
     const val SONG_MAX = 20
 

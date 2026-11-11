@@ -32,6 +32,26 @@ class LayoutsTest {
         assertEquals("♪ Falling - Trevor", note.artist)
     }
 
+    @Test fun playArrowIsTheDefaultPrefix() {
+        assertEquals(SongPrefix.ARROW, SongPrefix.of(null))
+        assertEquals(SongPrefix.ARROW, SongPrefix.of("garbage"))
+        assertEquals(SongPrefix.NONE, SongPrefix.of("NONE"))
+        assertEquals("▶ Falling - Trevor Daniel", Layouts.songText("Falling", "Trevor Daniel", SongPrefix.ARROW))
+        // ▶ is a confirmed glyph: it needs no extra permission and fits the 20 characters at a word.
+        assertEquals("", SongPrefix.ARROW.extra)
+        val s = Screen.lines("x", "y", Layouts.songText("Falling", "Trevor Daniel", SongPrefix.ARROW)!!, line3Max = Glyphs.SONG_MAX).sanitized()
+        assertEquals("▶ Falling - Trevor", s.artist)
+    }
+
+    @Test fun glyphCandidateScreenKeepsEveryGlyph() {
+        val screen = Presets.testScreens.first { it.first == "Glyph candidates" }.second
+        val sent = screen.sanitized()
+        val all = (sent.title + sent.album + sent.artist).filter { it != ' ' }
+        assertEquals("♩♬♭♯♠♣♥♦☼♀♂«»○◊", all)        // all 15, in order, none dropped or replaced
+        assertEquals(15, all.length)
+        assertEquals("♩ ♬ ♭ ♯ ♠", sent.title)
+    }
+
     @Test fun noteGlyphIsDroppedUnlessAllowed() {
         assertEquals("Falling", Glyphs.sanitize("♪ Falling", 20))
         assertEquals("♪ Falling", Glyphs.sanitize("♪ Falling", 20, "♪"))

@@ -2,17 +2,18 @@ package com.nowsteering.app
 
 import java.util.Locale
 
-/** What goes in front of the song on the nav screen. ♪ is untested on the car until the parked test passes. */
+/** What goes in front of the song on the nav screen. ▶ is proven on the car; the car shows ♪ ♫ as dots. */
 enum class SongPrefix(val glyph: String, val label: String) {
+    ARROW("▶", "▶ (play, default)"),
     NONE("", "none"),
     DOT("•", "• (dot)"),
-    NOTE("♪", "♪ (note)");
+    NOTE("♪", "♪ (shows as a dot on this car)");
 
     /** Extra glyph the car must be known to show, passed to [Glyphs.sanitize]. */
     val extra: String get() = if (this == NOTE) "♪" else ""
 
     companion object {
-        fun of(name: String?) = entries.firstOrNull { it.name == name } ?: NONE
+        fun of(name: String?) = entries.firstOrNull { it.name == name } ?: ARROW
     }
 }
 

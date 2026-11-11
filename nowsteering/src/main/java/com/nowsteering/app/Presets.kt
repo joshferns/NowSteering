@@ -3,11 +3,12 @@ package com.nowsteering.app
 /** Test strings for the Diagnostics text tester. */
 object Presets {
     private fun test(line1: String, line2: String, line3: String) =
-        Screen.lines(line1, line2, line3, line2Max = 20, line3Max = 20, extra = "♪♫").copy(titleMax = 17)
+        Screen.lines(line1, line2, line3, line2Max = 20, line3Max = 20, extra = Glyphs.TEST_EXTRA).copy(titleMax = 17)
 
     /** One-tap parked checks, shown top to bottom exactly as on the car (line 1 big, line 2 disc icon, line 3 person icon). */
     val testScreens: List<Pair<String, Screen>> = listOf(
         "♪ glyph" to test("♪ ♫ • ▶ ♪", "♪ Falling", "♪ Falling - Trevor"),
+        "Glyph candidates" to test("♩ ♬ ♭ ♯ ♠", "♣ ♥ ♦ ☼ ♀", "♂ « » ○ ◊"),
         "Song widths" to test("Song 20 chars", "Falling - Trevor Dan", "MWMWMWMWMWMWMWMWMWMW"),
         "Line 2 text" to test("Line 2 text", "1 hr 59 min 11:59pm", "12 min · 19:42"),
         "Bars" to test("Bars", "12 min ███▒▒▒", "1:02:31 left ██▒▒▒▒"),

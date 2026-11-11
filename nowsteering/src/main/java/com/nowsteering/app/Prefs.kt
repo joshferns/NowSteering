@@ -57,9 +57,19 @@ object Prefs {
         get() = sp.getBoolean("arrivalTime", false)
         set(v) = sp.edit().putBoolean("arrivalTime", v).apply()
 
-    /** Glyph before the song on the nav screen. None until ♪ has been checked on the car. */
+    /**
+     * Glyph before the song on the nav screen; ▶ by default. In 0.3.0 the only choices were none / • / ♪, and • was
+     * picked because ♪ shows as a dot, so a stored • or ♪ is switched to ▶ once. A deliberate "none" is kept.
+     */
     var songPrefix: SongPrefix
-        get() = SongPrefix.of(sp.getString("songPrefix", null))
+        get() {
+            if (!sp.getBoolean("songPrefixArrowDefault", false)) {
+                val old = sp.getString("songPrefix", null)
+                val migrated = if (old == null || old == "DOT" || old == "NOTE") SongPrefix.ARROW else SongPrefix.of(old)
+                sp.edit().putString("songPrefix", migrated.name).putBoolean("songPrefixArrowDefault", true).apply()
+            }
+            return SongPrefix.of(sp.getString("songPrefix", null))
+        }
         set(v) = sp.edit().putString("songPrefix", v.name).apply()
 
     /** Icon signatures already written to the log, so each new Maps icon is logged once. */
