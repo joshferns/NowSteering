@@ -35,7 +35,7 @@ Then **Choose car** → pick the car (e.g. "Honda HFT") and leave *Start automat
 - **Music.** Never takes audio focus, so music keeps playing. While navigating, re-claims the car screen on each
   new instruction and ~1.5 s after a song change or skip; when not navigating, the music app's song info shows.
 - **Phase 2a (v0.3.0).** Nav far from a turn: line 2 = Maps' time left + trip bar, line 3 = the playing song (else the road).
-  Not navigating: notification button **Show on car**, triple-tap Next, and the setting **Keep Now Steering on screen**
+  Not navigating: notification button **Show on car** and the setting **Keep Now Steering on screen**
   (mirrors the playing title with a time-left bar). Decisions and the 5d answer: [docs/PHASE2A_NOTES.md](docs/PHASE2A_NOTES.md).
   Tests: [parked](docs/PHASE2A_PARKED_TEST.md), [drive](docs/PHASE2A_DRIVE_TEST.md).
 - **Progress bars** (settings, both on): turn bar `█████▒▒▒▒▒` replaces the ETA line in the last 300 m before a turn;

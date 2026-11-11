@@ -1,4 +1,4 @@
-# Phase 2a: decisions (v0.3.0)
+# Phase 2a: decisions (v0.3.0, updated for 0.3.1)
 
 Which line is which on the car, top to bottom: **line 1** = big line (title field), **line 2** = disc icon (album field),
 **line 3** = person icon (artist field). The `[SCREEN]` log lines now list them in that order (before, artist came before album).
@@ -32,7 +32,7 @@ Which line is which on the car, top to bottom: **line 1** = big line (title fiel
   2:31 left ███▒▒▒        (the artist instead, for live streams)
   ```
   Pause or nothing playing: back to the normal idle screen.
-- **(a) Triple-tap Next = re-claim:** built. It only works when the button reaches us (see 5d). The log decides whether it stays.
+- **(a) Triple-tap Next = re-claim: dropped in 0.3.1.** The 11 Nov log confirmed it (see 5d). The ignored "NEXT x3" gesture is back to doing nothing.
 
 ## 5d: did the double-tapped Next reach us? No: it went straight to the music/video app.
 Checked against Android 13's own source (not guessed):
@@ -48,6 +48,18 @@ Checked against Android 13's own source (not guessed):
 
 Consequences: the double-tap detection (600 ms) is fine, nothing to fix. **(a) cannot work while the other app plays**, which is exactly when it
 would be needed; it works after "Show on car" or with Keep on (we hold the buttons then). Proposal: drop (a) if the YouTube drive confirms it; (b) and (c) stay.
+
+## 0.3.1: forwarding fix (11 Nov leg A log)
+5d confirmed: with Keep off, a single Next produced no `[KEY]` line and YouTube skipped (08:47:16); the press went straight to YouTube.
+Bug found in the same log: when the second press of a quick pair reached us (YouTube had just stopped its player, so we were the newest
+player again), we forwarded a skip into YouTube while it was loading (`NONE`), and ~2 s later YouTube showed "An error occurred"
+(08:47:24 → ERROR 08:47:26, and 08:49:30 → ERROR 08:49:32).
+- **Guard:** Next / Previous are forwarded only if the app is PLAYING or PAUSED **and** at least 2 s have passed since its last track change
+  or since it settled. Otherwise the press is **dropped**, logged as `[FWD] next DROPPED …` with the reason. An app in ERROR is left alone.
+  Dropped, not delayed: a missed press is harmless, a late skip is a wrong action.
+- **Lone UP:** nothing to fix. Only a DOWN ever starts an action; the lone UP at 08:47:23.320 produced no gesture. The `NEXT single` at
+  08:47:24.108 came from the DOWN at 08:47:23.505.
+- Play / pause forwarding is unchanged. Everything else is unchanged from 0.3.0.
 
 ## Also changed
 - **Version numbers:** `VERSION` file (now 0.3.0) names the release (`v0.3.0`), the APK and the log header. Bump it for every release.

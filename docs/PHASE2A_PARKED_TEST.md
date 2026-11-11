@@ -1,4 +1,4 @@
-# Phase 2a parked test (v0.3.0, about 10 min)
+# Phase 2a parked test (v0.3.0, about 10 min; 0.3.1 changes step 25 only)
 
 Rules: parked only. One action per step. Photos are fine here, never while driving. No voice dictation.
 
@@ -35,7 +35,7 @@ Rules: parked only. One action per step. Photos are fine here, never while drivi
 22. Look at the car. Note: back to the clock screen?
 23. Play the video again.
 24. Press steering **Next** once. Note: what happened (video skipped / nothing)?
-25. Press steering **Next** 3 times, fast. Note: what happened?
+25. *(Removed in 0.3.1: triple-tap Next no longer exists.)*
 26. Untick **Keep Now Steering on screen**.
 
 **Send**
@@ -43,5 +43,5 @@ Rules: parked only. One action per step. Photos are fine here, never while drivi
 
 ```
 6: …  7: …  8: …  9: …  10: …  12 chose: …
-14: …  16: …  18: …  20: …  22: …  24: …  25: …
+14: …  16: …  18: …  20: …  22: …  24: …
 ```
