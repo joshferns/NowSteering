@@ -1,4 +1,4 @@
-# Phase 2a parked test (v0.3.0, about 10 min; 0.3.1 changes step 25 only)
+# Phase 2a parked test (v0.3.0, about 10 min; 0.3.1 changes step 25; 0.3.2 changes step 12)
 
 Rules: parked only. One action per step. Photos are fine here, never while driving. No voice dictation.
 
@@ -18,7 +18,7 @@ Rules: parked only. One action per step. Photos are fine here, never while drivi
 9. Tap **Bars**. Note: are all blocks visible on both lines? 📷
 10. Tap **Mirror preview**. Note: does it look right? 📷
 11. Tap **Back to live**.
-12. In "Song on the nav screen" choose **♪** if step 6 showed notes; if not, choose **• (dot)**.
+12. *(Changed in 0.3.2: ▶ is now the default song glyph, nothing to choose. Glyph candidates: see PHASE2A_GLYPH_TEST.md.)*
 
 **"Show on car" button**
 13. Open the regular YouTube app. Play any video.
@@ -42,6 +42,6 @@ Rules: parked only. One action per step. Photos are fine here, never while drivi
 27. Diagnostics → **Share key lines**. Send it with your notes.
 
 ```
-6: …  7: …  8: …  9: …  10: …  12 chose: …
+6: …  7: …  8: …  9: …  10: …  
 14: …  16: …  18: …  20: …  22: …  24: …
 ```

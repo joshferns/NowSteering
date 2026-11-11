@@ -16,8 +16,9 @@ Which line is which on the car, top to bottom: **line 1** = big line (title fiel
 - **Song line:** `Title - Artist`, cut at a word to 20 characters (a hard cut only if the word boundary would lose 40% or more).
   Only a PLAYING or BUFFERING app counts; browsers ("Stories • Instagram") are ignored; a title that is empty after dropping
   unsupported characters (Hindi, emoji) falls back to the road; held for 4 s between songs so it does not flick to the road and back.
-- **Song prefix:** none until ♪ is seen working on the car. Diagnostics → "Song on the nav screen" chooses none / • / ♪.
-  Fallback is • or nothing, as briefed. ♪ is never sent to the car unless you choose it.
+- **Song prefix: ▶ by default** (0.3.2). The 11 Nov parked test showed the car draws ♪ and ♫ as dots; ▶ is proven. Diagnostics →
+  "Song on the nav screen" chooses ▶ / none / • / ♪. A saved • or ♪ is switched to ▶ once on upgrade; a deliberate "none" is kept.
+  Candidate note-like glyphs are checked with the "Glyph candidates" test screen (docs/PHASE2A_GLYPH_TEST.md).
 - **Near-turn switch** has hysteresis: enters at 300 m, leaves only above 340 m or on a new instruction, so a wobbling distance can't flip it.
 - **Song progress bar on the nav screen: not built** (optional; no line left for it). It is on the music-mirror screen below.
 

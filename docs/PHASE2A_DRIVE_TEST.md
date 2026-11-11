@@ -1,4 +1,4 @@
-# Phase 2a drive test (v0.3.1, two short drives plus a short fix check)
+# Phase 2a drive test (v0.3.2, two short drives plus a short fix check)
 
 Rules: the driver only glances. Never touch the phone while driving. No voice dictation. No photos while driving.
 Write notes when you stop. Do the parked test first.
