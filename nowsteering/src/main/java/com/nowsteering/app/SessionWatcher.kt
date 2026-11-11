@@ -26,6 +26,8 @@ class SessionWatcher(private val ctx: Context) {
     private val callbacks = HashMap<MediaSession.Token, MediaController.Callback>()
     private val lastState = HashMap<MediaSession.Token, Int>()
     private val lastTitle = HashMap<MediaSession.Token, String?>()
+    /** Last track change, or last return to PLAYING/PAUSED after loading: forwarding a skip right then breaks some players. */
+    private val quietSince = HashMap<MediaSession.Token, Long>()
 
     /** A music app changed song (it may have taken the car screen). */
     var onSongChange: ((String) -> Unit)? = null
@@ -60,6 +62,9 @@ class SessionWatcher(private val ctx: Context) {
 
     private fun isActive(state: Int?) = state == PlaybackState.STATE_PLAYING || state == PlaybackState.STATE_BUFFERING
 
+    /** Milliseconds since [c] last changed track or settled, or null if neither has been seen. */
+    fun quietMs(c: MediaController): Long? = quietSince[c.sessionToken]?.let { SystemClock.elapsedRealtime() - it }
+
     /** Is some app other than us playing right now (it would hold the car's screen and buttons)? */
     fun otherIsPlaying() = controllers.any { isMusic(it) && isActive(it.playbackState?.state) }
 
@@ -86,7 +91,7 @@ class SessionWatcher(private val ctx: Context) {
         val tokens = list.map { it.sessionToken }.toSet()
         callbacks.keys.filter { it !in tokens }.forEach { t ->
             controllers.firstOrNull { it.sessionToken == t }?.unregisterCallback(callbacks[t]!!)
-            callbacks.remove(t); lastState.remove(t); lastTitle.remove(t)
+            callbacks.remove(t); lastState.remove(t); lastTitle.remove(t); quietSince.remove(t)
         }
         for (c in list) {
             if (c.sessionToken in callbacks) continue
@@ -108,8 +113,12 @@ class SessionWatcher(private val ctx: Context) {
     private fun makeCallback(c: MediaController) = object : MediaController.Callback() {
         override fun onPlaybackStateChanged(state: PlaybackState?) {
             val s = state?.state ?: -1
-            if (lastState[c.sessionToken] == s) return
+            val prev = lastState[c.sessionToken]
+            if (prev == s) return
             lastState[c.sessionToken] = s
+            val settled = s == PlaybackState.STATE_PLAYING || s == PlaybackState.STATE_PAUSED
+            val wasSettled = prev == PlaybackState.STATE_PLAYING || prev == PlaybackState.STATE_PAUSED
+            if (settled && !wasSettled) quietSince[c.sessionToken] = SystemClock.elapsedRealtime()
             NsLog.log("SESSIONS", "${short(c.packageName)} state -> ${stateName(s)}")
             if (isMusic(c) && s == PlaybackState.STATE_PLAYING) lastPlayingPackage = c.packageName
             if (isMusic(c) && isActive(s)) onOtherStartedPlaying?.invoke(c.packageName)
@@ -122,6 +131,7 @@ class SessionWatcher(private val ctx: Context) {
             // Music apps resend the same metadata several times; only a new title is a song change.
             val title = md?.getString(MediaMetadata.METADATA_KEY_TITLE)
             if (!title.isNullOrEmpty() && lastTitle.containsKey(c.sessionToken) && lastTitle[c.sessionToken] != title) {
+                quietSince[c.sessionToken] = SystemClock.elapsedRealtime()
                 onSongChange?.invoke(c.packageName)
             }
             if (!title.isNullOrEmpty()) lastTitle[c.sessionToken] = title

@@ -133,7 +133,6 @@ class SteeringService : Service() {
         buttons = Buttons(
             onNext = { forward("next") { it.skipToNext() } },
             onDoubleNext = { toggleNavIdle() },
-            onTripleNext = { claimNow("triple-tap Next") },
             onPrevious = { forward("previous") { it.skipToPrevious() } },
             onPlayPause = { k -> togglePlayback(k) },
         )
@@ -353,7 +352,7 @@ class SteeringService : Service() {
         NsLog.log("CLAIM", "done: ${engine.current ?: "(nothing sent yet)"}; last button to us ${keyAgo()}")
     }
 
-    /** The user asked (triple-tap Next, notification button): claim straight away. */
+    /** The user asked (notification button): claim straight away. */
     fun claimNow(why: String) {
         if (callGuard.inCall) { NsLog.log("CLAIM", "$why: ignored, on a call"); return }
         NsLog.log("CLAIM", "$why: re-claiming now; last button to us ${keyAgo()}")
@@ -693,6 +692,13 @@ class SteeringService : Service() {
             return
         }
         val before = "${SessionWatcher.stateName(t.playbackState?.state)} ${SessionWatcher.describe(t.metadata)}"
+        if (what == "next" || what == "previous") {
+            val d = ForwardGuard.check(t.playbackState?.state, NsApp.watcher.quietMs(t))
+            if (!d.ok) {
+                NsLog.log("FWD", "$what DROPPED, not sent to ${SessionWatcher.short(t.packageName)}: ${d.reason} (before: $before)")
+                return
+            }
+        }
         action(t.transportControls)
         NsLog.log("FWD", "$what -> ${t.packageName} (before: $before)")
         if (what == "next" || what == "previous") claimSoon("forwarded $what")
