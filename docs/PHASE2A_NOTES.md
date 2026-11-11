@@ -62,6 +62,11 @@ player again), we forwarded a skip into YouTube while it was loading (`NONE`), a
   08:47:24.108 came from the DOWN at 08:47:23.505.
 - Play / pause forwarding is unchanged. Everything else is unchanged from 0.3.0.
 
+## 0.3.3: Diagnostics layout only
+The song-prefix dropdown showed no value and the three tester dropdowns were squashed beside their text fields. Dropdowns now use Android's
+normal closed-view layout and sit full width under their field; the song prefix is a radio list, so the chosen value is always visible.
+Nothing else changed.
+
 ## Also changed
 - **Version numbers:** `VERSION` file (now 0.3.0) names the release (`v0.3.0`), the APK and the log header. Bump it for every release.
 - **Dead reckoning (found in your 7 Nov log):** after 90 s with no Maps update the distance jumped back up to Maps' old value
