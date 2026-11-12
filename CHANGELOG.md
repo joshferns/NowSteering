@@ -3,6 +3,11 @@
 One entry per release, newest first. Dates are release dates (UTC). Every release updates this file and any doc it affects.
 The story behind each release, with what the car tests found, is in [docs/HISTORY.md](docs/HISTORY.md).
 
+## 0.4.0 (2026-11-12) — Phase 2b probe
+- Added: **Torque** section in Diagnostics (read-only). Shows: Torque installed (Pro / Lite / no), plugin service bound, Torque plugin API version, OBD connected, and the list of PIDs Torque has (active or ECU-supported) with live value and unit, refreshed every second. A value that Torque has not updated for 10 s shows "— (stale)"; a PID it never read shows "—".
+- Added: `[TORQUE]` log lines (bind/unbind, OBD connect/disconnect, PID list once per connection, values every 5 s), and **Share key lines** now includes them.
+- The car screen is unchanged. Torque is never started, written to, locked or sent commands by Now Steering.
+
 ## 0.3.4 (2026-11-12)
 - Fixed: **Share key lines** did nothing once the log was large (about 750 KB). It now always sends a file; **Share text** switches to a file above 60 000 characters; **Copy** keeps the last 60 000; any sharing failure shows a dialog and is logged.
 

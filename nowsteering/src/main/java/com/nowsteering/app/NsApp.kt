@@ -16,6 +16,7 @@ class NsApp : Application() {
     companion object {
         lateinit var instance: NsApp
         lateinit var watcher: SessionWatcher
+        lateinit var torque: TorqueClient
     }
 
     private var lastPlayers = ""
@@ -28,6 +29,8 @@ class NsApp : Application() {
         NsLog.log("APP", "=== process start === ${BuildConfig.VERSION_NAME} (${BuildConfig.GIT_SHA})")
         watcher = SessionWatcher(this)
         watcher.start()
+        torque = TorqueClient(this)
+        torque.start()
         val am = getSystemService(AudioManager::class.java)
         am.registerAudioPlaybackCallback(object : AudioManager.AudioPlaybackCallback() {
             override fun onPlaybackConfigChanged(configs: MutableList<AudioPlaybackConfiguration>) {

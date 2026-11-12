@@ -6,7 +6,7 @@ package com.nowsteering.app
  * and a line identical to the one before it (apart from its timestamp) is dropped.
  */
 object KeyLines {
-    private val tags = Regex("""\[(KEY|GESTURE|FWD|CLAIM|SESSION|SESSIONS|UI|NOTE|CALL)\]""")
+    private val tags = Regex("""\[(KEY|GESTURE|FWD|CLAIM|SESSION|SESSIONS|UI|NOTE|CALL|TORQUE)\]""")
 
     fun filter(log: String): List<String> {
         val kept = ArrayList<String>()

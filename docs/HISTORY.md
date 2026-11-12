@@ -58,10 +58,11 @@ Problem from the gate: with the regular YouTube app playing and no navigation, Y
 | 0.3.2 | 11 Nov | ▶ added as the song prefix and made the default; "Glyph candidates" test screen. | Glyph test: ♩ ♬ ♭ ♯ ♠ ♣ ♥ ♦ ☼ ◊ ♪ ♫ draw as dots; ♀ ♂ « » ○ ▶ draw. Leg B (Keep on) passed. |
 | 0.3.3 | 11 Nov | Diagnostics layout: normal dropdown layout, full-width tester fields, song prefix as a radio list. | Final check: Next while navigating works; Previous: first press restarts the song, second goes back one. |
 | 0.3.4 | 12 Nov | **Share key lines** sent as a file, with an error dialog if sharing fails. | The text export did nothing at ~750 KB (Android's share limit). |
+| 0.4.0 | 12 Nov | Phase 2b probe: read-only Torque section in Diagnostics, `[TORQUE]` log lines. Car screen unchanged. | TODO: fill in after the in-car probe. |
 
 ## Phase 2b: car data from Torque Pro (started 12 Nov)
 
-See DECISIONS and the Phase 2b section in CHANGELOG once released. TODO: fill in after the probe results.
+0.4.0 is the probe (Diagnostics only). See [PHASE2B_PROBE_SCRIPT.md](PHASE2B_PROBE_SCRIPT.md). TODO: fill in after the probe results.
 
 ## Open items
 

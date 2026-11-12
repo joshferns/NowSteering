@@ -47,6 +47,10 @@ Top to bottom:
 Share buttons: *Share key lines* and *Share file* send a `.txt` file; *Share text* sends text up to 60 000 characters and a file above that; *Copy* copies the last 60 000 characters.
 If sharing fails a dialog says why.
 
+### Torque section (0.4.0)
+
+Diagnostics, between "Active media sessions" and "Buttons". Lines: Torque installed, Plugin service bound, Torque version (plugin API number) and full-permission flag, OBD connected, optional Status line (not installed / waiting for Torque / not connected to the car), then one line per PID: `AE name: value unit` (A = active in Torque, E = ECU supports it). Button **Refresh PID list**. TODO: screenshot `docs/images/diagnostics-torque.png`.
+
 ## Notification ("Now Steering is on")
 
 ![Notification](images/notification.png) <!-- TODO screenshot -->

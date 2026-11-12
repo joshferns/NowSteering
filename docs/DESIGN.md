@@ -124,6 +124,14 @@ The chosen car's Bluetooth connect (ACL or A2DP) starts the service; disconnect 
 - **Share key lines** exports only buttons, gestures, forwards, claims, session changes, notes and mirror screens (repeats collapsed), **as a file**.
   **Share file** sends the whole log; **Share text** switches to a file above 60 000 characters. Text over about 100 KB cannot be shared as an intent extra (Android's call limit), which is why files are used. Any sharing failure shows a dialog.
 
+## Torque Pro data (`TorqueClient`, `TorquePid`) — Phase 2b probe
+
+- Reads Torque Pro through its plugin service (AIDL `org.prowl.torque.remote.ITorqueService`, copied unchanged into `src/main/aidl`; method order must not change). Bound by class name `org.prowl.torque.remote.TorqueService` in package `org.prowl.torque` (Lite: `org.prowl.torquefree`); `<queries>` in the manifest makes both visible on Android 11+.
+- Bind flags are 0 (no auto-create): Now Steering never starts Torque. If Torque is off, it retries every 10 s and also on Torque's `APP_LAUNCHED` broadcast.
+- Read-only calls only: getVersion, hasFullPermissions, isConnectedToECU, listAllPIDs / listActivePIDs / listECUSupportedPIDs (once per connection; Torque says they are expensive), getPIDInformation, getPIDValuesAsDouble, getPIDUpdateTime (1 s). Never used: sendCommandGetResponse, requestExclusiveLock, sendPIDData*, setPIDData, anything that writes.
+- Polling runs on its own thread; values older than 10 s are shown as stale, never as numbers.
+- TODO: confirm on the car that the service name binds, and which PIDs Torque exposes without being active on a dashboard.
+
 ## Source map
 
 | File | Role |

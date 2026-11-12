@@ -17,6 +17,7 @@ class KeyLinesTest {
         11-11 08:47:26.000 [SCREEN] sent '17:03 32 km/h' / '▶ Falling' / '2:31 left ███▒▒▒'
         11-11 08:47:27.000 [SCREEN] sent '17:03 32 km/h' / 'Sun 1 Nov' / 'Now Steering'
         11-11 08:47:28.000 [NOTE] Final check start
+        11-11 08:47:29.000 [TORQUE] values: Coolant=88°C
     """.trimIndent()
 
     @Test fun keepsTheLinesThatMatter() {
@@ -24,6 +25,7 @@ class KeyLinesTest {
         assertTrue(kept.any { it.contains("[KEY]") && it.contains("DOWN") })
         assertTrue(kept.any { it.contains("[FWD]") && it.contains("DROPPED") })
         assertTrue(kept.any { it.contains("[NOTE]") })
+        assertTrue(kept.any { it.contains("[TORQUE]") })
         assertTrue(kept.any { it.contains("▶ Falling") })       // mirror screen
     }
 

@@ -26,6 +26,7 @@ class DiagnosticsActivity : BaseActivity() {
     private lateinit var statusView: TextView
     private lateinit var navView: TextView
     private lateinit var sessionsView: TextView
+    private lateinit var torqueView: TextView
     private lateinit var logView: TextView
     private val inputs = ArrayList<EditText>()
 
@@ -99,6 +100,10 @@ class DiagnosticsActivity : BaseActivity() {
         }
         root.addView(styles)
 
+        section("Torque (read-only probe; nothing here changes the car screen)")
+        torqueView = mono(12f)
+        row(button("Refresh PID list") { NsApp.torque.refreshPidList() })
+
         section("Buttons")
         val tap = EditText(this).apply { setText(Prefs.tapWindowMs.toString()); inputType = InputType.TYPE_CLASS_NUMBER }
         row(TextView(this).apply { text = "Next tap window ms" }, tap, button("Apply") {
@@ -165,6 +170,32 @@ class DiagnosticsActivity : BaseActivity() {
             "glyph=${i.glyph} via ${i.glyphSource}\ndistance='${i.text.distance}' road='${i.text.road}'\n" +
                 "eta='${i.text.eta}' left='${i.text.remaining}'\nicon=${i.iconHex?.take(24) ?: "none"}…"
         sessionsView.text = NsApp.watcher.summary()
+        torqueView.text = torqueText()
+    }
+
+    private fun torqueText(): String {
+        val t = NsApp.torque.snapshot
+        val now = System.currentTimeMillis()
+        return buildString {
+            append("Torque installed: ").append(when (t.install) {
+                TorqueClient.Install.PRO -> "yes (Pro)"
+                TorqueClient.Install.LITE -> "Lite (plugin API may not work)"
+                TorqueClient.Install.NONE -> "no"
+            }).append('\n')
+            append("Plugin service bound: ").append(if (t.bound) "yes" else "no").append('\n')
+            append("Torque version: ").append(t.version).append("  full permissions: ").append(t.fullPermissions).append('\n')
+            append("OBD connected: ").append(when (t.obdConnected) { true -> "yes"; false -> "no"; null -> "unknown" }).append('\n')
+            if (t.note.isNotEmpty()) append("Status: ").append(t.note).append('\n')
+            if (t.pids.isNotEmpty()) {
+                append("\nPIDs (").append(t.pids.size).append(" of ").append(t.allCount).append(" known; A = active in Torque, E = ECU supports)\n")
+                t.pids.forEach { p ->
+                    val r = t.rows[p.id]
+                    append(if (p.active) 'A' else '-').append(if (p.ecuSupported) 'E' else '-').append(' ')
+                    append(p.shortName.ifEmpty { p.name }).append(": ")
+                    append(TorquePid.valueText(r?.first, r?.second, now)).append(' ').append(p.unit).append('\n')
+                }
+            }
+        }
     }
 
     private fun renderLog() {

@@ -12,6 +12,11 @@
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
 
+    <queries>
+        <package android:name="org.prowl.torque" />
+        <package android:name="org.prowl.torquefree" />
+    </queries>
+
     <application
         android:name=".NsApp"
         android:icon="@android:drawable/ic_menu_directions"

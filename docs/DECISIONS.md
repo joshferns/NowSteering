@@ -82,3 +82,6 @@ Newest last within each group. Dates are when the decision was taken (local). "W
 
 **D22. Phase 2b principle: never talk to the OBD adapter; only read values from Torque Pro** (12 Nov, PM)
 - *Why:* Torque owns the ELM327 connection and already uploads to the PM's Home Assistant. Reading its values is read-only; show nothing rather than a stale number.
+
+**D23. Torque probe binds without auto-create and only reads** (12 Nov)
+- *Why:* Now Steering must never start Torque or change how it talks to the adapter; it attaches when Torque is already running and only calls read methods.
