@@ -16,6 +16,11 @@ import android.widget.TextView
 
 /** The probe's tools: gesture readout, what the car is sent, Maps parse, sessions, text tester, event log. */
 class DiagnosticsActivity : BaseActivity() {
+    private companion object {
+        /** Text over this goes as a file: the chooser carries the text twice and Android's call limit is about 1 MB. */
+        const val MAX_SHARE_TEXT = 60_000
+    }
+
     private val main = Handler(Looper.getMainLooper())
     private lateinit var gestureView: TextView
     private lateinit var statusView: TextView
@@ -169,56 +174,71 @@ class DiagnosticsActivity : BaseActivity() {
     private fun fullLog() = NsApp.instance.header() + NsLog.fileText()
 
     /**
-     * Only the lines that show who held the car and whether the buttons reached us: buttons, gestures, forwards,
-     * claims, session changes, and the mirror screens. Repeated metadata lines are collapsed.
+     * Only the lines that show who held the car and whether the buttons reached us (see [KeyLines]).
+     * Sent as a file: a text extra over about 100 KB overflows Android's share call and fails silently.
      */
     private fun shareKeyLines() {
-        val keep = Regex("""\[(KEY|GESTURE|FWD|CLAIM|SESSION|SESSIONS|UI|NOTE|CALL)\]""")
-        val kept = ArrayList<String>()
-        var lastBody = ""
-        for (line in NsLog.fileText().lineSequence()) {
-            val isMirror = line.contains("[SCREEN]") && (line.contains("▶") || line.contains("♪"))
-            if (!isMirror && !keep.containsMatchIn(line)) continue
-            val body = line.substringAfter("] ", line)
-            if (body == lastBody) continue
-            lastBody = body
-            kept.add(line)
-        }
-        var text = NsApp.instance.header() + "[key lines only: ${kept.size} of the log]\n" + kept.joinToString("\n")
-        val limit = 200_000
-        if (text.length > limit) text = NsApp.instance.header() + "[truncated]\n" + text.takeLast(limit)
-        sendText(text)
+        val kept = KeyLines.filter(NsLog.fileText())
+        val text = NsApp.instance.header() + "[key lines only: ${kept.size}]\n" + kept.joinToString("\n") + "\n"
+        shareAsFile(LogFileProvider.KEYLINES_NAME, text, "key lines")
     }
 
     private fun shareText() {
-        var text = fullLog()
-        val limit = 200_000
-        if (text.length > limit) text = NsApp.instance.header() + "[truncated to the last $limit chars; use Share file]\n" + text.takeLast(limit)
-        sendText(text)
+        val text = fullLog()
+        if (text.length > MAX_SHARE_TEXT) {
+            toast("Log is large: sending it as a file")
+            shareAsFile(LogFileProvider.FILE_NAME, text, "log")
+            return
+        }
+        try {
+            startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).apply {
+                type = "text/plain"
+                putExtra(Intent.EXTRA_SUBJECT, "Now Steering log")
+                putExtra(Intent.EXTRA_TEXT, text)
+            }, "Share log"))
+        } catch (t: Throwable) {
+            shareFailed("log text", t)
+        }
     }
 
-    private fun sendText(text: String) {
-        startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).apply {
-            type = "text/plain"
-            putExtra(Intent.EXTRA_SUBJECT, "Now Steering log")
-            putExtra(Intent.EXTRA_TEXT, text)
-        }, "Share log"))
+    private fun shareFile() = shareAsFile(LogFileProvider.FILE_NAME, fullLog(), "log")
+
+    private fun shareAsFile(fileName: String, text: String, what: String) {
+        try {
+            val f = LogFileProvider.file(this, fileName)
+            f.writeText(text)
+            val uri = LogFileProvider.uri(fileName)
+            startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).apply {
+                type = "text/plain"
+                putExtra(Intent.EXTRA_SUBJECT, "Now Steering $what")
+                putExtra(Intent.EXTRA_STREAM, uri)
+                clipData = ClipData.newRawUri(what, uri)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }, "Share $what"))
+            NsLog.log("UI", "sharing $what as a file: ${f.length() / 1024} KB")
+        } catch (t: Throwable) {
+            shareFailed(what, t)
+        }
     }
 
-    private fun shareFile() {
-        LogFileProvider.shareFile(this).writeText(fullLog())
-        startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).apply {
-            type = "text/plain"
-            putExtra(Intent.EXTRA_SUBJECT, "Now Steering log")
-            putExtra(Intent.EXTRA_STREAM, LogFileProvider.URI)
-            clipData = ClipData.newRawUri("log", LogFileProvider.URI)
-            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-        }, "Share log file"))
+    /** Sharing must never fail silently: log it and say so on screen. */
+    private fun shareFailed(what: String, t: Throwable) {
+        NsLog.log("UI", "sharing $what FAILED: ${t.javaClass.simpleName} ${t.message}")
+        android.app.AlertDialog.Builder(this)
+            .setTitle("Sharing failed")
+            .setMessage("Could not share the $what:\n${t.javaClass.simpleName}: ${t.message}\n\nTry Share file instead.")
+            .setPositiveButton("OK", null)
+            .show()
     }
 
     private fun copyLog() {
-        getSystemService(ClipboardManager::class.java).setPrimaryClip(ClipData.newPlainText("Now Steering log", fullLog().takeLast(200_000)))
-        toast("Log copied")
+        try {
+            getSystemService(ClipboardManager::class.java)
+                .setPrimaryClip(ClipData.newPlainText("Now Steering log", fullLog().takeLast(MAX_SHARE_TEXT)))
+            toast("Copied the last ${MAX_SHARE_TEXT / 1000} KB of the log")
+        } catch (t: Throwable) {
+            shareFailed("copy", t)
+        }
     }
 
     private fun confirmClear() {
