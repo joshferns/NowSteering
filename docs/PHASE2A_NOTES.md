@@ -67,6 +67,12 @@ The song-prefix dropdown showed no value and the three tester dropdowns were squ
 normal closed-view layout and sit full width under their field; the song prefix is a radio list, so the chosen value is always visible.
 Nothing else changed.
 
+## 0.3.4: Share key lines
+12 Nov: tapping Share key lines did nothing once the log reached ~750 KB. Cause: the export put up to 200 000 characters into the share
+intent's text, and Android's chooser carries that text twice, which overflows the ~1 MB limit of one inter-process call (128 KB worked,
+the larger one failed silently). Now: key lines are always sent as a **file** (`nowsteering_keylines.txt`, any size); Share text switches to a
+file above 60 000 characters; Copy keeps the last 60 000; and any sharing failure is logged and shown in a dialog instead of being swallowed.
+
 ## Also changed
 - **Version numbers:** `VERSION` file (now 0.3.0) names the release (`v0.3.0`), the APK and the log header. Bump it for every release.
 - **Dead reckoning (found in your 7 Nov log):** after 90 s with no Maps update the distance jumped back up to Maps' old value
