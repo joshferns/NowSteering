@@ -11,7 +11,7 @@ import android.media.session.PlaybackState
  */
 object ForwardGuard {
     /** Quiet time needed after a track change or after the app settles (PLAYING or PAUSED again). */
-    const val SETTLE_MS = 2000L
+    const val SETTLE_MS = CarProfile.HONDA_SETTLE_MS
 
     data class Decision(val ok: Boolean, val reason: String)
 

@@ -72,6 +72,8 @@ What each screen looks like: [docs/CAR_SCREENS.md](docs/CAR_SCREENS.md). What ea
 | [CHANGELOG.md](CHANGELOG.md) | one entry per release |
 | [docs/HISTORY.md](docs/HISTORY.md) | timeline of phases 0, 1 and 2a, with what each car test found |
 | [docs/DESIGN.md](docs/DESIGN.md) | how it works: architecture and every rule |
+| [docs/FIELDS.md](docs/FIELDS.md) | every v2 field: source, unit, staleness limit |
+| [docs/V2_REGRESSION_DRIVE.md](docs/V2_REGRESSION_DRIVE.md) | 0.5.0 regression drive: everything must look like 0.4.0 |
 | [docs/CAR_SCREENS.md](docs/CAR_SCREENS.md) | every car screen as a mock-up, when it appears, what the buttons do |
 | [docs/PHONE_UI.md](docs/PHONE_UI.md) | main screen, Diagnostics, the notification; every setting and its default |
 | [docs/DECISIONS.md](docs/DECISIONS.md) | decision log with the reasons |

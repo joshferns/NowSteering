@@ -132,14 +132,56 @@ The chosen car's Bluetooth connect (ACL or A2DP) starts the service; disconnect 
 - Polling runs on its own thread; values older than 10 s are shown as stale, never as numbers.
 - TODO: confirm on the car that the service name binds, and which PIDs Torque exposes without being active on a dashboard.
 
+## v2 model
+
+Since 0.5.0 the inside of the app follows a Home Assistant-style model. The car screens are unchanged (a golden test proves it); the structure is what changes. Fields are listed in [FIELDS.md](FIELDS.md).
+
+```mermaid
+flowchart LR
+    subgraph Sources
+        P[Phone: clock, GPS, battery]
+        M[Google Maps]
+        U[Music app]
+        T[Torque Pro]
+    end
+    P --> F
+    M --> F
+    U --> F
+    T --> F
+    F[Fields<br/>name, value, unit, age] --> R[Rules<br/>first matching situation]
+    R --> FA[Face<br/>3 line templates]
+    FA --> W[Warning layer<br/>override slot]
+    W --> DE[DisplayEngine<br/>widths from the car profile]
+    CP[Car profile<br/>widths, glyphs, quirks] --> FA
+    CP --> DE
+```
+
+1. **Sources.** Phone, Google Maps, the music app, Torque Pro (Home Assistant later). Each can be missing; the app keeps working without it.
+2. **Fields** (`Fields.kt`, `LiveFields.kt`). Named values with a unit and an age. A field is missing when its source has nothing, when it is blank, when its age reaches its limit, or when the car profile forbids it. A field is read from its source only when a template or rule asks for it, once per screen (this keeps the song hold and the turn-zone hysteresis behaving exactly as before).
+3. **Faces and templates** (`Template.kt`). A face is three lines for the car's rows (title, line 2, line 3). A line is a list of alternatives; the first one that renders non-empty (and, if it says so, fits) wins. A template has `{field}`, `{field|fallback}` and `{bar field cells}`. Two or more spaces split a template into parts; a part that uses a missing field is dropped whole, so there are no dashes and no orphan units. The engine cleans and cuts to the width at a word when the screen is sent.
+4. **Rules** (`Rules.kt`). An ordered list; the first rule whose conditions hold picks the face. The Current preset: **arrived → rerouting → near the turn** (last ~300 m, enter 300 m / leave 340 m, in two variants depending on the "turn bar" setting) **→ navigating → music playing with Keep on screen → idle**. Conditions are lazy flags, so the turn zone is only updated when the navigation rules are reached.
+5. **Warning layer** (`WarningLayer`). One override slot above any face. In Phase 1 it carries only the notices that already existed (Power saving on, Nav ended, No music app / link). Coolant and voltage warnings are Phase 2.
+6. **Car profile** (`CarProfile.kt`). One data object per car: measured widths (17 / 20 / 20), the widths faces use (15 / 18 / 18 and 20 for songs), glyphs that draw and glyphs that show as dots, refresh (1 per second), button timings, row order, fields never to show, and quirks. Phase 1 has only the 2014 Honda City, hard-coded; there is no picker.
+7. **Presets.** Today's screens are the first preset, "Current", built as data from the settings each time a screen is made (`CurrentPreset.build`). Test screens and the Diagnostics tester are unchanged.
+
+Not changed: dead reckoning, claim rules, buttons, call safeguard, settings and their defaults, logging.
+
+### How "identical" is proved
+
+`LegacyScreens` (test code) is the v0.4.0 screen code copied unchanged. `GoldenTest` runs it and the new pipeline side by side on 40 000 frames built from every Maps notification (485) and song (89) in the recorded logs, with every setting combination, random speed, distance-to-turn walks across 300 / 340 m, trip, song length and arrival states: the text sent to the car is identical in every frame. It also rebuilds all 754 idle screens in the recorded logs from the clock, date and speed on each line. The only difference before cleaning is a stray space when Maps gives no arrow glyph (cleaning removes it).
+
+Known quirks kept on purpose (identical rule): the Power saving notice has its two lower lines in the opposite order to the other notices (`turn it off` on line 2, `nav less smooth` on line 3) because the old code passed them in the artist/album order. The Current idle screen uses a fallback `--` for a missing speed (the template `{speed|--}`).
+
 ## Source map
 
 | File | Role |
 |---|---|
-| `SteeringService.kt` | screens, session, silent audio, claim rules, GPS, buttons wiring |
+| `SteeringService.kt` | gathers the inputs for a screen, session, silent audio, claim rules, GPS, buttons wiring |
 | `NavListener.kt` | Maps notification → `NavState`; Notification-access entry point |
 | `NavText.kt`, `IconSig.kt` | parsing text and arrow icons |
-| `DeadReckoner.kt`, `Bars.kt`, `Layouts.kt` | distance rules, bars, line layouts, turn zone |
+| `DeadReckoner.kt`, `Bars.kt`, `Layouts.kt` | distance rules, bars, turn zone (`Layouts.songText / farLine2 / mirrorLine3` are the v0.4.0 line builders, now used only by the golden test) |
+| `Fields.kt`, `LiveFields.kt`, `Template.kt`, `Rules.kt`, `CarProfile.kt` | v2: fields, templates and faces, rules and the Current preset, warning layer, car profile (see "v2 model") |
+| `TorqueClient.kt`, `TorquePid.kt` | read-only Torque Pro probe; `TorqueFields` maps PIDs to `car.*` fields |
 | `DisplayEngine.kt`, `Glyphs.kt` | widths, glyph fallback, rate limit |
 | `SessionWatcher.kt` | other apps' media sessions, song info, takeover events |
 | `Buttons.kt`, `ForwardGuard.kt` | gestures and forwarding policy |

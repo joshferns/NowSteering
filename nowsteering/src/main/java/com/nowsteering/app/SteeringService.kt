@@ -91,9 +91,8 @@ class SteeringService : Service() {
         private set
     private var testScreen: Screen? = null
     /** Shown from arrival until the car moves, a new trip starts, double Next, or the car disconnects. */
-    private var arrived: Screen? = null
-    private var notice: Screen? = null
-    private var noticeUntil = 0L
+    private var arrived: Arrived? = null
+    private val warnings = WarningLayer()
 
     private var speedKmh: Int? = null
     private var speedMps = 0f
@@ -265,7 +264,7 @@ class SteeringService : Service() {
     private fun powerSaveWarning(why: String) {
         if (!getSystemService(android.os.PowerManager::class.java).isPowerSaveMode) return
         NsLog.log("PHONE", "power saving is on ($why): warning on the car")
-        showNotice(Screen("Power saving on", "nav less smooth", "turn it off"), 6000)
+        showNotice(WarningLayer.POWER_SAVING, 6000)
     }
 
     private fun logPowerSave(why: String) {
@@ -425,7 +424,7 @@ class SteeringService : Service() {
                 navEndedSinceArrival = true
             } else {
                 NsLog.log("SCREEN", "nav ended before arrival (${last?.text?.remaining ?: "?"} left): idle screen")
-                showNotice(Screen("Nav ended", "", ""), 4000)
+                showNotice(WarningLayer.NAV_ENDED, 4000)
             }
             return
         }
@@ -435,12 +434,12 @@ class SteeringService : Service() {
             powerSaveWarning("navigation started")
         }
         lastNav = info
-        notice = null
+        warnings.clear()
         // Destination marker within 30 m: arrived now (Maps can take a minute to end navigation).
         val left = NavTextParser.metersOf(info.text.remaining)
         if (info.glyph == "●" && left != null && left <= 30) {
             if (arrived == null) setArrived(info, "destination marker with ${info.text.remaining} left")
-            else if (info.text.road.isNotEmpty()) arrived = arrived!!.copy(artist = info.text.road)
+            else if (info.text.road.isNotEmpty()) arrived = arrived!!.copy(road = info.text.road)
             refreshScreen()
             return
         }
@@ -479,7 +478,7 @@ class SteeringService : Service() {
     }
 
     private fun setArrived(i: NavState.Info, why: String) {
-        arrived = Screen("● Arrived", i.text.road, clockFmt.format(Date()))
+        arrived = Arrived(i.text.road, clockFmt.format(Date()))
         arrivedAt = SystemClock.elapsedRealtime()
         arrivedLoc = lastLoc
         navEndedSinceArrival = false
@@ -526,62 +525,53 @@ class SteeringService : Service() {
     }
 
     /** Show a short message on the car for [ms], then go back to the live screen. */
-    private fun showNotice(s: Screen, ms: Long = 3000) {
-        notice = s
-        noticeUntil = SystemClock.elapsedRealtime() + ms
+    private fun showNotice(f: Face, ms: Long = 3000) {
+        warnings.post(f, ms, SystemClock.elapsedRealtime())
         refreshScreen()
     }
 
     private fun refreshScreen(force: Boolean = false) {
-        val nav = if (NavState.active) shownNav else null
+        val warning = warnings.active(SystemClock.elapsedRealtime())
         val s = when {
-            notice != null && SystemClock.elapsedRealtime() < noticeUntil -> notice!!
-            mode == Mode.TEST -> testScreen ?: idleScreen()
-            arrived != null -> arrived!!
-            nav != null && mode == Mode.AUTO -> navScreen(nav)
-            else -> idleScreen()
+            warning != null -> warning.render(Fields())
+            mode == Mode.TEST -> testScreen ?: resolveScreen(idleOnly = true)
+            else -> resolveScreen()
         }
         engine.show(s, force)
     }
 
     /**
-     * Nav screen. Line 1: arrow + distance to the turn. Far from the turn: line 2 = time left + trip bar,
-     * line 3 = the song that is playing (else the road). Last 300 m: line 2 = turn bar, line 3 = Maps' road text.
+     * The live screen: the Current preset's first matching rule (arrived, rerouting, near the turn, navigating,
+     * music with Keep on screen, idle), filled from the fields. See docs/DESIGN.md and docs/FIELDS.md.
      */
-    private fun navScreen(i: NavState.Info): Screen {
-        val t = i.text
-        // A real reroute: say so until Maps sends the new instruction.
-        if (NavTextParser.isRerouting(t.road)) return Screen("• Rerouting...", "", "")
-        val toTurn = dr.shown()
-        val distance = toTurn?.let { NavTextParser.formatMeters(it) } ?: t.distance
-        val title = "${i.glyph} $distance".trim()
-        val near = zone.update(toTurn)
-        val prefix = Prefs.songPrefix
+    private fun resolveScreen(idleOnly: Boolean = false): Screen {
+        val nav = if (!idleOnly && NavState.active && mode == Mode.AUTO) shownNav else null
+        val settings = Settings.fromPrefs()
+        val inputs = LiveInputs(
+            settings = settings,
+            now = Date(),
+            speedKmh = speedKmh,
+            speedAgeMs = if (speedAt == 0L) null else SystemClock.elapsedRealtime() - speedAt,
+            arrived = if (idleOnly) null else arrived,
+            nav = nav,
+            toTurnMeters = { dr.shown() },
+            tripMeters = tripMeters,
+            song = { currentSong() },
+            other = ::otherField,
+        )
+        return CurrentPreset.build(settings).resolve(LiveContext(inputs, zone))
+    }
 
-        val line2 = if (near && Prefs.turnBar) {
-            "${i.glyph} ${Bars.turnBar(minOf(toTurn!!, Bars.TURN_BAR_FROM_M))}"
-        } else {
-            Layouts.farLine2(t.timeLeft, t.remaining, t.eta, Bars.tripFraction(NavTextParser.metersOf(t.remaining), tripMeters),
-                showArrival = Prefs.arrivalTime, showBar = Prefs.tripBar)
-        }
-        val song = if (near) null else currentSong()?.let { Layouts.songText(it.title, it.artist, prefix) }
-        return Screen.lines(title, line2, song ?: t.road,
-            line2Max = 20, line3Max = if (song != null) Glyphs.SONG_MAX else Glyphs.LINE_MAX, extra = prefix.extra)
+    /** Fields from sources the pure layer does not know: the phone battery and Torque's car data. */
+    private fun otherField(name: String): FieldValue? = when {
+        name == "phone.battery" -> getSystemService(android.os.BatteryManager::class.java)
+            ?.getIntProperty(android.os.BatteryManager.BATTERY_PROPERTY_CAPACITY)
+            ?.takeIf { it in 0..100 }?.let { FieldValue("$it", it.toDouble(), "%") }
+        name.startsWith("car.") -> TorqueFields.read(NsApp.torque.snapshot, name, System.currentTimeMillis())
+        else -> null
     }
 
     private val clockFmt = SimpleDateFormat("HH:mm", Locale.US)
-    private val dateFmt = SimpleDateFormat("EEE d MMM", Locale.US)
-    private val secFmt = SimpleDateFormat("HH:mm:ss", Locale.US)
-
-    private fun idleScreen(): Screen {
-        val now = Date()
-        val fresh = speedKmh != null && SystemClock.elapsedRealtime() - speedAt < 5000
-        val speed = if (fresh) "$speedKmh" else "--"
-        // With seconds (lock-screen refresh test) the title is 15 chars: "08:41:23 35km/h".
-        val title = if (Prefs.idleSeconds) "${secFmt.format(now)} ${speed}km/h" else "${clockFmt.format(now)}  $speed km/h"
-        if (Prefs.keepOnScreen) mirrorScreen(title)?.let { return it }
-        return Screen(title, dateFmt.format(now), "Now Steering")
-    }
 
     /**
      * What is playing, held for 4 s when a music app briefly reports nothing between songs
@@ -591,15 +581,6 @@ class SteeringService : Service() {
         val now = SystemClock.elapsedRealtime()
         NsApp.watcher.song()?.let { heldSong = it; heldSongAt = now; return it }
         return heldSong?.takeIf { now - heldSongAt < 4000 }
-    }
-
-    /** "Keep Now Steering on screen", not navigating: clock + speed, the playing title, and a time-left bar. */
-    private fun mirrorScreen(title: String): Screen? {
-        val song = currentSong() ?: return null
-        if (Glyphs.sanitize(song.title, 40).count { it.isLetterOrDigit() } < 2) return null
-        val artist = Glyphs.sanitize(song.artist, 40)
-        return Screen.lines(title, "▶ ${song.title}", Layouts.mirrorLine3(song.durationMs, song.positionMs, artist),
-            line2Max = Glyphs.SONG_MAX, line3Max = Glyphs.SONG_MAX)
     }
 
     private val ticker = object : Runnable {
@@ -688,7 +669,7 @@ class SteeringService : Service() {
             val access = NsApp.instance.listenerEnabled()
             NsLog.log("FWD", "$what: no music app session to forward to (notification access=$access)")
             // Tell the driver on the car screen why the button did nothing.
-            showNotice(if (access) Screen("No music app", "Start music first", "") else Screen("No music link", "Grant notif access", "in Now Steering app"))
+            showNotice(if (access) WarningLayer.NO_MUSIC_APP else WarningLayer.NO_MUSIC_LINK)
             return
         }
         val before = "${SessionWatcher.stateName(t.playbackState?.state)} ${SessionWatcher.describe(t.metadata)}"

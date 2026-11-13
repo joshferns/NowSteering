@@ -58,7 +58,8 @@ Problem from the gate: with the regular YouTube app playing and no navigation, Y
 | 0.3.2 | 11 Nov | ▶ added as the song prefix and made the default; "Glyph candidates" test screen. | Glyph test: ♩ ♬ ♭ ♯ ♠ ♣ ♥ ♦ ☼ ◊ ♪ ♫ draw as dots; ♀ ♂ « » ○ ▶ draw. Leg B (Keep on) passed. |
 | 0.3.3 | 11 Nov | Diagnostics layout: normal dropdown layout, full-width tester fields, song prefix as a radio list. | Final check: Next while navigating works; Previous: first press restarts the song, second goes back one. |
 | 0.3.4 | 12 Nov | **Share key lines** sent as a file, with an error dialog if sharing fails. | The text export did nothing at ~750 KB (Android's share limit). |
-| 0.4.0 | 12 Nov | Phase 2b probe: read-only Torque section in Diagnostics, `[TORQUE]` log lines. Car screen unchanged. | TODO: fill in after the in-car probe. |
+| 0.4.0 | 12 Nov | Phase 2b probe: read-only Torque section in Diagnostics, `[TORQUE]` log lines. Car screen unchanged. | Probe passed (3 drives, 345 snapshots): bind works, API 38; coolant PID 05, voltage PID 42, Trip KPL confirmed; fuel remaining unreliable (2.75 % at 72 km); Home Assistant kept updating. Bug: Diagnostics showed "87 of 0 known" (count overwritten). |
+| 0.5.0 | 13 Nov | v2 foundation: fields, rules, faces, warning layer, car profile; no visible change. C.2 (car data on screen) paused for the redesign. | TODO: regression drive. |
 
 ## Phase 2b: car data from Torque Pro (started 12 Nov)
 

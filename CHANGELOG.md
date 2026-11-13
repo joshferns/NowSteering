@@ -3,6 +3,12 @@
 One entry per release, newest first. Dates are release dates (UTC). Every release updates this file and any doc it affects.
 The story behind each release, with what the car tests found, is in [docs/HISTORY.md](docs/HISTORY.md).
 
+## 0.5.0 (2026-11-13) — v2 foundation, no visible change
+- Internal rebuild around the v2 model: sources → **fields** → **rules** → **faces** (line templates) → **warning layer** → display engine, with a **car profile** for the 2014 Honda City. Today's screens are the first preset, "Current", expressed as data. See [docs/DESIGN.md](docs/DESIGN.md#v2-model) and [docs/FIELDS.md](docs/FIELDS.md).
+- Nothing changes for the user: every car screen, setting and default, dead reckoning, claim rules, buttons, call safeguard, logging and Diagnostics (incl. Torque) behave as in 0.4.0. Keep on screen is still OFF by default.
+- Torque fields (`car.coolant`, `car.voltage`, `car.rpm`, `car.trip_kmpl`, any `car.<pid>`) and `phone.battery` can be read; no face shows them yet.
+- Tests: 89 (was 45), including a golden replay of 40 000 frames and all 754 recorded idle screens against the v0.4.0 code.
+
 ## 0.4.0 (2026-11-12) — Phase 2b probe
 - Added: **Torque** section in Diagnostics (read-only). Shows: Torque installed (Pro / Lite / no), plugin service bound, Torque plugin API version, OBD connected, and the list of PIDs Torque has (active or ECU-supported) with live value and unit, refreshed every second. A value that Torque has not updated for 10 s shows "— (stale)"; a PID it never read shows "—".
 - Added: `[TORQUE]` log lines (bind/unbind, OBD connect/disconnect, PID list once per connection, values every 5 s), and **Share key lines** now includes them.

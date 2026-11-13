@@ -65,6 +65,7 @@ class TorqueClient(private val ctx: Context) {
     private var lastValuesLog = 0L
     private var lastNote = ""
     private var listedForConnection = false
+    private var allCount = 0
 
     private val conn = object : ServiceConnection {
         override fun onServiceConnected(name: ComponentName, binder: IBinder) {
@@ -169,7 +170,7 @@ class TorqueClient(private val ctx: Context) {
         val now = System.currentTimeMillis()
         val ecu = s.isConnectedToECU
         if (snapshot.obdConnected != ecu) NsLog.log("TORQUE", "OBD ${if (ecu) "connected" else "not connected"} (isConnectedToECU)")
-        var snap = snapshot.copy(install = installed(), bound = true, obdConnected = ecu, note = "")
+        var snap = snapshot.copy(install = installed(), bound = true, obdConnected = ecu, note = "", allCount = allCount)
         if (snap.version == "—") {
             val v = s.version; val full = s.hasFullPermissions()
             snap = snap.copy(version = "API $v", fullPermissions = full.toString())
@@ -181,7 +182,7 @@ class TorqueClient(private val ctx: Context) {
             listedForConnection = false
             return
         }
-        if (!listedForConnection) { snap = snap.copy(pids = listPids(s)); listedForConnection = true; lastValuesLog = 0 }
+        if (!listedForConnection) { snap = snap.copy(pids = listPids(s)).copy(allCount = allCount); listedForConnection = true; lastValuesLog = 0 }
         val ids = pidIds
         if (ids.isNotEmpty()) {
             val values = s.getPIDValuesAsDouble(ids.toTypedArray())
@@ -210,7 +211,7 @@ class TorqueClient(private val ctx: Context) {
         val info = if (shown.isEmpty()) emptyArray() else s.getPIDInformation(shown.toTypedArray())
         val pids = shown.mapIndexed { i, id -> TorquePid.parseInfo(id, info.getOrNull(i), id in active, id in ecu) }
         pidIds = pids.map { it.id }
-        snapshot = snapshot.copy(allCount = all.size)
+        allCount = all.size
         NsLog.log("TORQUE", "PID list: ${all.size} known, ${ecu.size} ECU-supported, ${active.size} active; showing ${pids.size}")
         pids.forEach { NsLog.log("TORQUE", "PID ${it.id} | ${it.name} | ${it.shortName} | ${it.unit} | ${if (it.active) "active " else ""}${if (it.ecuSupported) "ecu" else ""}") }
         return pids

@@ -10,7 +10,7 @@ import android.os.SystemClock
  */
 class DisplayEngine(private val sink: (Screen) -> Unit) {
     companion object {
-        const val MIN_INTERVAL_MS = 1000L
+        const val MIN_INTERVAL_MS = CarProfile.HONDA_REFRESH_MS
     }
 
     private val main = Handler(Looper.getMainLooper())

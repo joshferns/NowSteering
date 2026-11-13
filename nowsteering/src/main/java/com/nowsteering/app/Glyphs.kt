@@ -4,15 +4,15 @@ import java.text.Normalizer
 
 /** What the Honda head unit can render (Phase 0), and ASCII fallbacks for everything else. */
 object Glyphs {
-    const val TITLE_MAX = 15
-    const val LINE_MAX = 18
+    const val TITLE_MAX = CarProfile.HONDA_SAFE_TITLE
+    const val LINE_MAX = CarProfile.HONDA_SAFE_LINE
     /** Glyphs the test screens and the free-form tester let through, to see which the car draws as a real symbol. */
     const val TEST_EXTRA = "♪♫♩♬♭♯♠♣♥♦☼♀♂○◊"
     /** Song line: the car measured 20 characters for artist/album in Phase 0 (the parked width test re-checks it). */
-    const val SONG_MAX = 20
+    const val SONG_MAX = CarProfile.HONDA_SONG_LINE
 
     /** Confirmed non-Latin-1 glyphs. ASCII and Latin-1 (U+00A0..U+00FF) are always allowed. */
-    private const val CONFIRMED = "←→↑↓↖↗•●▲▶▼█▓▒▄"
+    private const val CONFIRMED = CarProfile.HONDA_CONFIRMED
 
     private val fallback = mapOf(
         '⇐' to "<=", '⇒' to "=>", '⇑' to "^", '⇓' to "v",

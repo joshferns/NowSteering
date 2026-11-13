@@ -85,3 +85,12 @@ Newest last within each group. Dates are when the decision was taken (local). "W
 
 **D23. Torque probe binds without auto-create and only reads** (12 Nov)
 - *Why:* Now Steering must never start Torque or change how it talks to the adapter; it attaches when Torque is already running and only calls read methods.
+
+**D24. Redesign as a customisable, Home Assistant-style system; C.2 paused** (13 Nov, PM)
+- *Why:* car data is one of many things people may want on three lines. Fields + faces + rules + a car profile let screens become data (and later shareable files) instead of code. Phase 1 changes nothing visible so the structure can be proven first.
+
+**D25. Prove "no change" with a golden test against the old code** (13 Nov)
+- *Why:* the v0.4.0 screen code stays in the tests (`LegacyScreens`) and is run side by side with the new pipeline. This caught a swapped idle row during the rebuild. Remove it with the old `Layouts` helpers once v2 has run in the car for a while.
+
+**D26. Fields are read lazily; missing parts are dropped, never dashed** (13 Nov, PM)
+- *Why:* laziness keeps the song hold and turn-zone hysteresis identical to 0.4.0; dropping a part (with its unit) avoids "-- km/h" style noise. The Current preset keeps `--` for a missing speed on purpose, via `{speed|--}`.
