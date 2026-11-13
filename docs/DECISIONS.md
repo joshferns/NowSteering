@@ -94,3 +94,6 @@ Newest last within each group. Dates are when the decision was taken (local). "W
 
 **D26. Fields are read lazily; missing parts are dropped, never dashed** (13 Nov, PM)
 - *Why:* laziness keeps the song hold and turn-zone hysteresis identical to 0.4.0; dropping a part (with its unit) avoids "-- km/h" style noise. The Current preset keeps `--` for a missing speed on purpose, via `{speed|--}`.
+
+**D27. Keep the Power saving notice's line order until Phase 2; keep `LegacyScreens` for about a week of drives** (13 Nov, PM)
+- *Why:* Phase 1 must stay identical to 0.4.0; the notice's reversed rows (`turn it off` on line 2) get flipped in Phase 2. The old-code reference and golden test stay until v2 has had about a week in the car.

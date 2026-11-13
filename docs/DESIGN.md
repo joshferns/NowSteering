@@ -130,7 +130,7 @@ The chosen car's Bluetooth connect (ACL or A2DP) starts the service; disconnect 
 - Bind flags are 0 (no auto-create): Now Steering never starts Torque. If Torque is off, it retries every 10 s and also on Torque's `APP_LAUNCHED` broadcast.
 - Read-only calls only: getVersion, hasFullPermissions, isConnectedToECU, listAllPIDs / listActivePIDs / listECUSupportedPIDs (once per connection; Torque says they are expensive), getPIDInformation, getPIDValuesAsDouble, getPIDUpdateTime (1 s). Never used: sendCommandGetResponse, requestExclusiveLock, sendPIDData*, setPIDData, anything that writes.
 - Polling runs on its own thread; values older than 10 s are shown as stale, never as numbers.
-- TODO: confirm on the car that the service name binds, and which PIDs Torque exposes without being active on a dashboard.
+- Confirmed by the 12 Nov probe: the bind to `org.prowl.torque/.remote.TorqueService` works (plugin API 38; full permissions = false, which is fine because nothing here sends raw commands). Torque exposed 202 PIDs, 86 ECU-supported, 62 active.
 
 ## v2 model
 

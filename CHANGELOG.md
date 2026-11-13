@@ -3,6 +3,9 @@
 One entry per release, newest first. Dates are release dates (UTC). Every release updates this file and any doc it affects.
 The story behind each release, with what the car tests found, is in [docs/HISTORY.md](docs/HISTORY.md).
 
+## Next release (planned, not yet built)
+- Map `car.fuel_used` to Torque PID `ff1271`; add distance to empty (`ff126a`) to the Honda profile's never-show list. (`car.trip_kmpl` = `ff1206` is already mapped and now confirmed.)
+
 ## 0.5.0 (2026-11-13) — v2 foundation, no visible change
 - Internal rebuild around the v2 model: sources → **fields** → **rules** → **faces** (line templates) → **warning layer** → display engine, with a **car profile** for the 2014 Honda City. Today's screens are the first preset, "Current", expressed as data. See [docs/DESIGN.md](docs/DESIGN.md#v2-model) and [docs/FIELDS.md](docs/FIELDS.md).
 - Nothing changes for the user: every car screen, setting and default, dead reckoning, claim rules, buttons, call safeguard, logging and Diagnostics (incl. Torque) behave as in 0.4.0. Keep on screen is still OFF by default.

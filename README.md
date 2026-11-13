@@ -46,7 +46,7 @@ The app does **not** ask for microphone, phone, contacts, storage or internet.
 Samsung **Power saving** switches GPS off when the screen is off, so speed and the distance countdown stop updating on a locked phone.
 Turn it off in Quick settings (or Settings → Battery → Power saving) before you drive. If it is on, the car shows
 `Power saving on / turn it off / nav less smooth` for 6 s when the app starts, when navigation starts and when you switch it on.
-TODO: confirm the exact Samsung menu path for Power saving on this phone.
+On the Galaxy S20 FE (One UI 5.1): Settings → Battery and device care → Battery → Power saving (turn it off).
 
 ## Daily use
 

@@ -35,13 +35,13 @@ Faces and rules read **fields**: named values with a unit and an age. The names 
 | `car.coolant` | Torque | °C | 10 s | Engine coolant temperature, PID `05` |
 | `car.voltage` | Torque | V | 10 s | Control module voltage, PID `42` (not the adapter's `Volts(Ad)`) |
 | `car.rpm` | Torque | rpm | 10 s | Engine speed, PID `0c` |
-| `car.trip_kmpl` | Torque | km/l | 10 s | Trip average fuel economy (Torque "Trip KPL", the one Home Assistant calls Trip Avg km/L; **not** `KPL(avg)`, a long-term average). TODO: confirm the PID id `ff1206` from a probe log |
-| `car.fuel_used` | Torque | l | 10 s | Fuel used this trip. TODO: PID id not yet mapped; reachable as `car.<pid>` once known |
+| `car.trip_kmpl` | Torque | km/l | 10 s | Trip average fuel economy: Torque PID `ff1206`, "Trip average KPL" (the one Home Assistant calls Trip Avg km/L; **not** `KPL(avg)`, a long-term average). Confirmed from the 12 Nov probe log |
+| `car.fuel_used` | Torque | l | 10 s | Fuel used this trip: Torque PID `ff1271`, "Fuel used (trip)". Confirmed from the 12 Nov probe log; mapped in the app from the release after 0.5.0 (until then read it as `car.ff1271`) |
 | `car.<pid>` | Torque | PID's own | 10 s | Any Torque PID by id, e.g. `car.0b`, `car.0f`. Ids are matched, never short names (two PIDs are both called "Intake") |
 
 ## Never shown
 
-The car profile lists fields no face may show; they always read as missing. For the 2014 Honda City: `car.fuel_level`, `car.fuel_remaining` (the ECU reported 2.75 % with 72 km to empty).
+The car profile lists fields no face may show; they always read as missing. For the 2014 Honda City: `car.fuel_level`, `car.fuel_remaining` (the ECU reported 2.75 % with 72 km to empty) and distance to empty (PID `ff126a`, `car.ff126a`, unreliable on this car). Other PIDs seen in the probe: `ff125c` fuel cost (trip). The profile gets the `ff126a` entry in the release after 0.5.0.
 
 ## Torque rules
 

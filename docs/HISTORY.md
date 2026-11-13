@@ -63,11 +63,11 @@ Problem from the gate: with the regular YouTube app playing and no navigation, Y
 
 ## Phase 2b: car data from Torque Pro (started 12 Nov)
 
-0.4.0 is the probe (Diagnostics only). See [PHASE2B_PROBE_SCRIPT.md](PHASE2B_PROBE_SCRIPT.md). TODO: fill in after the probe results.
+0.4.0 is the probe (Diagnostics only). See [PHASE2B_PROBE_SCRIPT.md](PHASE2B_PROBE_SCRIPT.md). Result (12 Nov, PASSED): bind works, API 38; OBD connect/disconnect tracked across 3 drives (17:25–17:34, 17:46–17:56, 19:38–19:49) with 345 value snapshots, also with Diagnostics closed; 202 PIDs known, 86 ECU-supported, 62 active; Home Assistant kept updating. Values for the car screen: coolant PID 05, voltage PID 42 (not the adapter's Volts(Ad)), trip average KPL ff1206, fuel used (trip) ff1271. Fuel remaining (2.75 % at 72 km) and distance to empty (ff126a) are unreliable on this car: never shown. C.2 was then paused for the v2 redesign.
 
 ## Open items
 
 - TODO: the first Phase 1 build (0.2.1) was never installed; confirm it was never used.
-- TODO: exact dates of the 3 to 5 Nov gate drives (the PM summary says "about 5 clean drives").
+- Phase 1 gate: about 5 normal drives on 3–5 Nov 2026 on v0.2.21, closed 5 Nov; exact per-drive dates were not recorded.
 - TODO: AVRCP version of the head unit (assumed old: no album art).
 - TODO: the build that each early Phase 1 observation belongs to comes from session notes; re-check against the saved logs if exactness matters.
