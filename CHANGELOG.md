@@ -3,8 +3,15 @@
 One entry per release, newest first. Dates are release dates (UTC). Every release updates this file and any doc it affects.
 The story behind each release, with what the car tests found, is in [docs/HISTORY.md](docs/HISTORY.md).
 
-## Next release (planned, not yet built)
-- Map `car.fuel_used` to Torque PID `ff1271`; add distance to empty (`ff126a`) to the Honda profile's never-show list. (`car.trip_kmpl` = `ff1206` is already mapped and now confirmed.)
+## 0.6.0 (2026-11-18) — presets, trip cost, Torque on screen, warnings
+- **Presets**: Driver (new default), Trip, Car (only when Torque is installed), Classic (exactly 0.5.0). Picker on the main screen with a preview of every situation at the car's widths. Double Next cycles them and shows the name for 2 s (it still clears Arrived first); the nav / clock toggle is gone. See [docs/CAR_SCREENS.md](docs/CAR_SCREENS.md).
+- **Driver**: speed always visible (17-character line 1 with fallbacks), music on two lines that it gives up near a turn (turn bar, speed and the song's time left). Missing or stale values are dropped, never shown as `--`.
+- **Trip cost**: settings for fuel price and typical km/L; `trip.cost`, `trip.cost_to_go`, `trip.cost_total`, `trip.cost_per_10km`; Trip preset line 3 `Rs ~125 trip · ~48 now`. `[TRIP]` log line every 60 s and at disconnect. Fuel used = Torque PID `ff1271`, long-term km/L = `ff5202`. See [docs/FIELDS.md](docs/FIELDS.md#trip-cost-060).
+- **Warnings** (all presets; setting *Engine warnings from Torque*, on): `▲ HOT 107°C` (coolant > 105 °C for 5 s, clears < 102 °C for 5 s) and `▲ LOW 12.0V` (voltage < 12.2 V for 10 s with RPM > 500, clears > 12.6 V for 5 s). Line 1 on idle / music, line 2 on navigation, held near a turn; 10 s on / 50 s off. Thresholds in the car profile, read-only in Diagnostics, with **Test HOT warning** and **Test LOW warning** buttons.
+- **Keep Now Steering on screen** is on for new installs (existing installs keep their value).
+- Fixed / small: **Share key lines** now includes every `[SCREEN]` line plus `[TRIP]`, `[WARN]`, `[EXPERIMENT]`; an artist `Unknown`, `<unknown>` or empty is treated as missing (no `- artist`); the Power saving notice reads top to bottom (`nav less smooth` then `turn it off`); `car.distance_to_empty` and `car.ff126a` never shown.
+- Diagnostics: **Play-button experiment** (reports PAUSED for 10 s, logs any PLAY key). Default behaviour unchanged.
+- Tests: 148 (was 89), including presets that fit 17 / 20 / 20 with long values, cost maths, warning thresholds, hysteresis and placement. Classic is still golden-tested against the 0.4.0 code.
 
 ## 0.5.0 (2026-11-13) — v2 foundation, no visible change
 - Internal rebuild around the v2 model: sources → **fields** → **rules** → **faces** (line templates) → **warning layer** → display engine, with a **car profile** for the 2014 Honda City. Today's screens are the first preset, "Current", expressed as data. See [docs/DESIGN.md](docs/DESIGN.md#v2-model) and [docs/FIELDS.md](docs/FIELDS.md).

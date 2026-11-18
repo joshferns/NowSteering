@@ -97,3 +97,21 @@ Newest last within each group. Dates are when the decision was taken (local). "W
 
 **D27. Keep the Power saving notice's line order until Phase 2; keep `LegacyScreens` for about a week of drives** (13 Nov, PM)
 - *Why:* Phase 1 must stay identical to 0.4.0; the notice's reversed rows (`turn it off` on line 2) get flipped in Phase 2. The old-code reference and golden test stay until v2 has had about a week in the car.
+
+**D28. Driver is the default preset; Classic keeps the old screens** (18 Nov, PM)
+- *Why:* the new default is built around speed, song time left and the turn bar. Classic exists for anyone who prefers 0.5.0 and is still compared with the old code by the golden test.
+
+**D29. Missing or stale means dropped, never `--`, in the new presets** (18 Nov, PM)
+- *Why:* a dash looks like a value. A part of a line (with its unit) disappears when its field is missing; Classic keeps its old `--` on purpose.
+
+**D30. Double Next cycles presets; Keep on screen is on for new installs** (18 Nov, PM)
+- *Why:* the nav / clock toggle is not needed when the faces show what matters. An existing install keeps its saved Keep-on value (and, if it was never saved, stays off).
+
+**D31. Trip = Bluetooth connect to disconnect; fuel from Torque's trip counter** (18 Nov, PM)
+- *Why:* the cost follows the drive the user thinks of. Torque's own trip counter is the source of litres, so a Torque trip reset shows up in the figures; the `[TRIP]` log lets the numbers be checked against Torque and Home Assistant.
+
+**D32. Warnings use the car profile's thresholds and a 10 s on / 50 s off rhythm** (18 Nov, PM)
+- *Why:* coolant and voltage matter, but a permanent flashing line is worse than none. Held near a turn so the turn instructions are never hidden; shown right after.
+
+**D33. The Power saving notice reads top to bottom** (18 Nov, PM)
+- *Why:* it was reversed since the first build. `No music link` has the same problem (`in Now Steering app` above `Grant notif access`); not changed yet.

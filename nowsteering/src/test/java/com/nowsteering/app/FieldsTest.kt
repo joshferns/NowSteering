@@ -12,12 +12,12 @@ class FieldsTest {
         val doc = File("../docs/FIELDS.md").readText()
         for (f in FieldCatalog.all) assertTrue("docs/FIELDS.md lacks `${f.name}`", doc.contains("`${f.name}`"))
         // and the other way: every `name` in the first column of the table exists
-        val inDoc = Regex("""^\| `([a-z_.<>]+)` \|""", RegexOption.MULTILINE).findAll(doc).map { it.groupValues[1] }.toSet()
+        val inDoc = Regex("""^\| `([a-z0-9_.<>]+)` \|""", RegexOption.MULTILINE).findAll(doc).map { it.groupValues[1] }.toSet()
         for (n in inDoc) assertTrue("FIELDS.md lists `$n`, which is not in the catalogue", n == "car.<pid>" || FieldCatalog.def(n) != null)
     }
 
     @Test fun namesAreShortDottedLowerCase() {
-        for (f in FieldCatalog.all) assertTrue(f.name, Regex("""^[a-z][a-z_]*(\.[a-z_]+)*$""").matches(f.name))
+        for (f in FieldCatalog.all) assertTrue(f.name, Regex("""^[a-z][a-z_]*(\.[a-z0-9_]+)*$""").matches(f.name))
     }
 
     @Test fun anyPidByIdIsACarField() {

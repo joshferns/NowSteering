@@ -33,7 +33,7 @@ class GoldenTest {
     } + listOf(
         "Falling" to "Trevor Daniel", "Falling" to "", "Falling - Trevor Daniel" to "Trevor Daniel", "A" to "B",
         "🚗🙂" to "Trevor", "नमस्ते" to "", "Tum Hi Ho (From \"Aashiqui 2\")" to "Arijit Singh",
-        "WWWWWWWWWWWWWWWWWWWWWW" to "MMMMMMMMMMMMMMMMMMMMMMMM", "  Padded  " to "  Artist  ", "Ünïcödé Tïtle" to "Ånd Àrtist",
+        "WWWWWWWWWWWWWWWWWWWWWW" to "MMMMMMMMMMMMMMMMMMMMMMMM", "Falling" to "Unknown", "Falling" to "<unknown>", "Tum Hi Ho" to " <Unknown Artist> ", "  Padded  " to "  Artist  ", "Ünïcödé Tïtle" to "Ånd Àrtist",
     ))
 
     private val glyphs = listOf("←", "→", "↑", "↓", "↖", "↗", "•", "●", "U", "O", "")
@@ -66,7 +66,7 @@ class GoldenTest {
             val song = if (r.nextInt(3) == 0) null else songs[r.nextInt(songs.size)].let { (t, a) ->
                 val dur = when (r.nextInt(6)) { 0 -> 0L; 1 -> -1L; 2 -> 90_000_000L; else -> 120_000L + r.nextInt(300_000) }
                 val pos = if (r.nextInt(6) == 0) null else if (r.nextInt(8) == 0) -5L else r.nextInt(400_000).toLong()
-                SessionWatcher.Song("com.test", t, a, dur, pos)
+                SessionWatcher.Song("com.test", t, SongText.cleanArtist(a), dur, pos)   // cleaned at the source, as SessionWatcher does
             }
             val arrived = if (r.nextInt(15) == 0) Arrived(text.road, "19:${10 + r.nextInt(50)}") else null
             val cal = Calendar.getInstance().apply { timeInMillis = 1_793_000_000_000L + r.nextInt(86_400) * 1000L * 5 }

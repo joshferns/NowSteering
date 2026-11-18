@@ -29,6 +29,8 @@ class CarReceiver : BroadcastReceiver() {
             else -> return
         }
         if (!isCar) return
+        // A trip runs from the car's connect to its disconnect, whether or not auto-start is on.
+        if (connected) NsApp.trip.start("car connected") else NsApp.trip.end("car disconnected")
         if (!Prefs.autoStart) {
             NsLog.log("BT", "car ${if (connected) "connected" else "disconnected"} but auto-start is off")
             return

@@ -83,7 +83,7 @@ class SessionWatcher(private val ctx: Context) {
                 ((SystemClock.elapsedRealtime() - ps.lastPositionUpdateTime) * ps.playbackSpeed).toLong().coerceAtLeast(0) else 0L
             pos = ps.position + advance
         }
-        return Song(c.packageName, title, md.getString(MediaMetadata.METADATA_KEY_ARTIST)?.trim().orEmpty(),
+        return Song(c.packageName, title, SongText.cleanArtist(md.getString(MediaMetadata.METADATA_KEY_ARTIST)),
             md.getLong(MediaMetadata.METADATA_KEY_DURATION), pos)
     }
 

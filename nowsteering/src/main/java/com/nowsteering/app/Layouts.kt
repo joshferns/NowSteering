@@ -17,6 +17,14 @@ enum class SongPrefix(val glyph: String, val label: String) {
     }
 }
 
+/** What a music app calls an artist it does not know is not an artist: treat it as missing. */
+object SongText {
+    fun cleanArtist(raw: String?): String {
+        val a = (raw ?: "").trim()
+        return if (a.isEmpty() || a.lowercase() in setOf("unknown", "<unknown>", "unknown artist", "<unknown artist>")) "" else a
+    }
+}
+
 /** The car's lines, as pure functions. Line 1 = big line, line 2 = disc-icon line, line 3 = person-icon line. */
 object Layouts {
     /** "Title - Artist" for the song line, or null when nothing readable is left after dropping unsupported characters. */

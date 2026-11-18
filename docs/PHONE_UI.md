@@ -28,6 +28,18 @@ Top to bottom:
 | Arrival time on line 2 (replaces the trip bar) | off | Line 2 far from a turn reads `12 min · 19:42` instead. |
 | Keep Now Steering on screen (take the car back when another app plays) | off | Re-claims the car when another app starts or changes; shows the mirror screen when not navigating. |
 
+### Preset, trip cost, warnings (0.6.0)
+
+Under the status box:
+
+| Section | Contents |
+|---|---|
+| **Screen preset** | Radio list: Driver (default), Trip, Car (only when Torque Pro is installed), Classic. Below it a text preview of every situation (idle, music, navigating with and without music, last 300 m, rerouting, arrived, a coolant warning) with the sample values, cut at the car's widths. Changing the choice applies within a second. TODO: screenshot `docs/images/presets.png` |
+| **Trip cost** | *Fuel price (Rs per litre)* and *Typical km/L (optional)*, **Save cost settings**. Empty price means no cost anywhere; the Trip preset then shows the road on line 3. *Engine warnings from Torque* tick box (only when Torque is installed, on by default). |
+| Settings | The three tick boxes for turn bar, trip bar and arrival time now say "Classic preset:" (Driver / Trip / Car have their own fixed layouts). *Keep Now Steering on screen* is on for a new install; an existing install keeps its saved value. |
+
+Double Next on the wheel cycles the preset (and still clears the Arrived screen first).
+
 ## Diagnostics
 
 ![Diagnostics](images/diagnostics.png) <!-- TODO screenshot -->
@@ -46,6 +58,10 @@ Top to bottom:
 
 Share buttons: *Share key lines* and *Share file* send a `.txt` file; *Share text* sends text up to 60 000 characters and a file above that; *Copy* copies the last 60 000 characters.
 If sharing fails a dialog says why.
+
+### Warnings, trip, Play experiment (0.6.0)
+
+Diagnostics also has: **Test HOT warning** / **Test LOW warning** (next to the other car test screens, one tap sends the warning screen once; **Back to live** clears it); **Engine warnings and trip (read-only)**: the thresholds from the car profile, the active warnings, the setting, trip distance and fuel price; **Play-button experiment**: a button that reports our session as PAUSED for 10 s and says whether a PLAY key arrived (see the parked test).
 
 ### Torque section (0.4.0)
 

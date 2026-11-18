@@ -23,6 +23,8 @@ class LiveInputs(
     val toTurnMeters: () -> Double?,
     val tripMeters: Double?,
     val song: () -> SessionWatcher.Song?,
+    /** Kilometres driven on this trip (car connect to disconnect); null when no trip is running. */
+    val tripKm: Double? = null,
     /** Fields from other sources (phone battery, Torque): `car.*`, `phone.battery`. */
     val other: (String) -> FieldValue? = { null },
 )
@@ -34,6 +36,17 @@ class LiveContext(private val inp: LiveInputs, private val zone: TurnZone, profi
     private val toTurn: Double? by lazy { inp.toTurnMeters() }
     private val near: Boolean by lazy { zone.update(toTurn) }
     private val songNow: SessionWatcher.Song? by lazy { inp.song() }
+
+    /** Cost maths on this screen's fields: fuel and km/L come through [fields], so stale Torque values are already missing. */
+    private val costs: TripCosts by lazy {
+        TripMath.compute(TripInputs(
+            price = inp.settings.fuelPrice, typicalKmpl = inp.settings.typicalKmpl, distanceKm = inp.tripKm,
+            fuelUsedL = fields.number("car.fuel_used"), tripKmpl = fields.number("car.trip_kmpl"),
+            longTermKmpl = fields.number("car.kmpl_longterm"),
+            distanceLeftKm = inp.nav?.let { n -> NavTextParser.metersOf(n.text.remaining)?.div(1000.0) }))
+    }
+
+    private fun rupees(v: Double?) = v?.let { FieldValue(TripMath.rupees(it), it, "Rs") }
 
     override fun flag(name: String): Boolean = when (name) {
         "arrived" -> inp.arrived != null
@@ -80,6 +93,12 @@ class LiveContext(private val inp: LiveInputs, private val zone: TurnZone, profi
             }
             "arrived.road" -> inp.arrived?.let { FieldValue(it.road) }
             "arrived.time" -> inp.arrived?.let { FieldValue(it.time) }
+            "trip.distance" -> inp.tripKm?.let { FieldValue(String.format(Locale.US, "%.1f", it), it, "km") }
+            "trip.kmpl" -> costs.kmpl?.let { FieldValue(String.format(Locale.US, "%.1f", it), it, "km/l") }
+            "trip.cost" -> rupees(costs.cost)
+            "trip.cost_to_go" -> rupees(costs.costToGo)
+            "trip.cost_total" -> rupees(costs.total)
+            "trip.cost_per_10km" -> rupees(costs.per10Km)
             "song.playing" -> if (songNow != null) FieldValue("true") else null
             "song.title" -> songNow?.takeIf { Glyphs.sanitize(it.title, 40).count { c -> c.isLetterOrDigit() } >= 2 }?.let { FieldValue(it.title) }
             "song.artist" -> songNow?.let { FieldValue(Glyphs.sanitize(it.artist, 40)) }
@@ -100,7 +119,7 @@ class LiveContext(private val inp: LiveInputs, private val zone: TurnZone, profi
         /** "Title - Artist" cleaned for the car; null when too little is readable (a title in Devanagari or emoji only). */
         fun songBody(title: String?, artist: String?, extra: String): String? {
             val t = (title ?: "").trim()
-            val a = (artist ?: "").trim()
+            val a = SongText.cleanArtist(artist)
             if (t.isEmpty()) return null
             val body = if (a.isEmpty() || t.contains(a, ignoreCase = true)) t else "$t - $a"
             val clean = Glyphs.sanitize(body, 80, extra)
@@ -121,9 +140,13 @@ object TorqueFields {
         "car.coolant" to "05",
         "car.voltage" to "42",
         "car.rpm" to "0c",
-        "car.trip_kmpl" to "ff1206",   // TODO: confirm this id against a probe log (Trip KPL, not KPL(avg))
-        // car.fuel_used: id not yet confirmed; reachable as car.<pid> once known
+        "car.trip_kmpl" to "ff1206",        // "Trip average KPL" (confirmed in the 12 Nov probe log)
+        "car.fuel_used" to "ff1271",        // "Fuel used (trip)"
+        "car.kmpl_longterm" to "ff5202",    // long-term average KPL
     )
+
+    /** Decimals shown per named field (the others get up to 2). */
+    private val decimals = mapOf("car.coolant" to 0, "car.rpm" to 0, "car.voltage" to 1, "car.trip_kmpl" to 1, "car.kmpl_longterm" to 1, "car.fuel_used" to 2)
 
     /** The PID id behind a field name, or null if it is not a car field or has no PID yet. */
     fun pidOf(field: String): String? = named[field] ?: field.takeIf { it.startsWith("car.") && it.length > 4 }?.removePrefix("car.")?.let { normalize(it) }
@@ -135,7 +158,12 @@ object TorqueFields {
         val p = snap.pids.firstOrNull { normalize(it.id) == want } ?: return null
         val (v, at) = snap.rows[p.id] ?: return null
         if (at <= 0L || v.isNaN() || v.isInfinite()) return null
-        val text = if (Math.abs(v) >= 100) String.format(Locale.US, "%.0f", v) else String.format(Locale.US, "%.2f", v).trimEnd('0').trimEnd('.')
+        val d = decimals[field]
+        val text = when {
+            d != null -> String.format(Locale.US, "%.${d}f", v)
+            Math.abs(v) >= 100 -> String.format(Locale.US, "%.0f", v)
+            else -> String.format(Locale.US, "%.2f", v).trimEnd('0').trimEnd('.')
+        }
         return FieldValue(text, v, p.unit, (nowMs - at).coerceAtLeast(0))
     }
 }

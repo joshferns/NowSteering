@@ -18,6 +18,15 @@ class MainActivity : BaseActivity() {
     private lateinit var checklist: TextView
     private lateinit var status: TextView
     private lateinit var carView: TextView
+    private lateinit var presetView: TextView
+
+    private fun trimNumber(v: Double) = if (v == Math.floor(v)) v.toLong().toString() else v.toString()
+
+    /** What the selected preset will show on the car, cut the way the car cuts it. */
+    private fun renderPreview() {
+        val s = com.nowsteering.app.Settings.fromPrefs()
+        presetView.text = "What the car will show (sample values)\n\n" + PresetPreview.format(PresetPreview.render(s))
+    }
 
     private val ticker = object : Runnable {
         override fun run() { render(); main.postDelayed(this, 1000) }
@@ -29,6 +38,55 @@ class MainActivity : BaseActivity() {
         section("Now Steering")
         checklist = big(0).apply { textSize = 17f }
         status = mono(13f)
+
+        section("Screen preset")
+        val torque = NsApp.torque.snapshot.install != TorqueClient.Install.NONE
+        presetView = mono(12f)
+        val group = android.widget.RadioGroup(this)
+        PresetId.available(torque).forEach { id ->
+            group.addView(android.widget.RadioButton(this).apply {
+                this.id = android.view.View.generateViewId()
+                text = "${id.label}: ${id.blurb}"
+                isChecked = id == Prefs.preset
+                setOnCheckedChangeListener { _, b ->
+                    if (b && id != Prefs.preset) { Prefs.preset = id; NsLog.log("UI", "preset = ${id.label}"); renderPreview() }
+                }
+            })
+        }
+        // Put the radio group above its preview.
+        root.removeView(presetView)
+        root.addView(group)
+        root.addView(presetView)
+        renderPreview()
+
+        section("Trip cost")
+        note("Fuel price turns on the cost lines of the Trip preset. Typical km/L is only for when Torque has no figure.")
+        val price = android.widget.EditText(this).apply {
+            hint = "Fuel price, Rs per litre (empty = no cost)"
+            inputType = android.text.InputType.TYPE_CLASS_NUMBER or android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL
+            setText(Prefs.fuelPrice?.let { trimNumber(it) } ?: "")
+        }
+        val typical = android.widget.EditText(this).apply {
+            hint = "Typical km/L (optional)"
+            inputType = android.text.InputType.TYPE_CLASS_NUMBER or android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL
+            setText(Prefs.typicalKmpl?.let { trimNumber(it) } ?: "")
+        }
+        root.addView(price); root.addView(typical)
+        row(button("Save cost settings") {
+            Prefs.fuelPrice = price.text.toString().trim().replace(',', '.').toDoubleOrNull()?.takeIf { it > 0 }
+            Prefs.typicalKmpl = typical.text.toString().trim().replace(',', '.').toDoubleOrNull()?.takeIf { it > 0 }
+            price.setText(Prefs.fuelPrice?.let { trimNumber(it) } ?: ""); typical.setText(Prefs.typicalKmpl?.let { trimNumber(it) } ?: "")
+            NsLog.log("UI", "fuel price = ${Prefs.fuelPrice ?: "not set"}, typical km/L = ${Prefs.typicalKmpl ?: "not set"}")
+            renderPreview()
+            toast("Saved")
+        })
+        if (torque) {
+            root.addView(CheckBox(this).apply {
+                text = "Engine warnings from Torque (coolant high, voltage low)"
+                isChecked = Prefs.engineWarnings
+                setOnCheckedChangeListener { _, b -> Prefs.engineWarnings = b; NsLog.log("UI", "engine warnings = $b") }
+            })
+        }
 
         section("Car")
         carView = mono(14f)
@@ -42,17 +100,17 @@ class MainActivity : BaseActivity() {
             }
         })
         root.addView(CheckBox(this).apply {
-            text = "Turn bar (last 300 m before a turn)"
+            text = "Classic preset: turn bar (last 300 m before a turn)"
             isChecked = Prefs.turnBar
             setOnCheckedChangeListener { _, b -> Prefs.turnBar = b; NsLog.log("UI", "turn bar = $b") }
         })
         root.addView(CheckBox(this).apply {
-            text = "Trip bar (after the ETA)"
+            text = "Classic preset: trip bar (after the ETA)"
             isChecked = Prefs.tripBar
             setOnCheckedChangeListener { _, b -> Prefs.tripBar = b; NsLog.log("UI", "trip bar = $b") }
         })
         root.addView(CheckBox(this).apply {
-            text = "Arrival time on line 2 (replaces the trip bar)"
+            text = "Classic preset: arrival time on line 2 (replaces the trip bar)"
             isChecked = Prefs.arrivalTime
             setOnCheckedChangeListener { _, b -> Prefs.arrivalTime = b; NsLog.log("UI", "arrival time = $b") }
         })

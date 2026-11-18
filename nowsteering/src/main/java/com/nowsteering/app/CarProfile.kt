@@ -30,6 +30,8 @@ data class CarProfile(
     /** Fields a face must never show for this car (they exist, but their numbers are wrong). */
     val neverShow: Set<String>,
     val quirks: List<String>,
+    /** When the car screen warns about coolant and voltage (read-only in Diagnostics). */
+    val warnings: WarningThresholds = WarningThresholds(),
 ) {
     companion object {
         /** `const` mirrors, for places that need compile-time constants (Glyphs, DisplayEngine, ForwardGuard). */
@@ -52,7 +54,7 @@ data class CarProfile(
             nextTapWindowMs = 600,
             forwardSettleMs = HONDA_SETTLE_MS,
             rowOrder = listOf("title", "album", "artist"),
-            neverShow = setOf("car.fuel_level", "car.fuel_remaining"),
+            neverShow = setOf("car.fuel_level", "car.fuel_remaining", "car.distance_to_empty", "car.ff126a"),
             quirks = listOf(
                 "no scrolling: text longer than the line is cut",
                 "Next / Previous are never forwarded within 2 s of a track change or while the app is loading",
@@ -64,4 +66,28 @@ data class CarProfile(
 
         val current: CarProfile get() = HONDA_CITY_2014
     }
+}
+
+/** Engine warnings (Phase 2). Values from the 2014 Honda City decisions; the profile owns them so another car can differ. */
+data class WarningThresholds(
+    /** Coolant: warn above [coolantHighC] for [coolantHoldMs]; clear below [coolantClearC] for [coolantClearMs]. */
+    val coolantHighC: Double = 105.0,
+    val coolantClearC: Double = 102.0,
+    val coolantHoldMs: Long = 5_000,
+    val coolantClearMs: Long = 5_000,
+    /** Voltage (engine running only: RPM above [rpmMin]): warn below [voltageLowV] for [voltageHoldMs]; clear above [voltageClearV] for [voltageClearMs]. */
+    val voltageLowV: Double = 12.2,
+    val voltageClearV: Double = 12.6,
+    val voltageHoldMs: Long = 10_000,
+    val voltageClearMs: Long = 5_000,
+    val rpmMin: Double = 500.0,
+    /** Rhythm while a warning lasts: on [showMs], off [hideMs]; a worse reading shows it again at once. */
+    val showMs: Long = 10_000,
+    val hideMs: Long = 50_000,
+    val worsenC: Double = 3.0,
+    val worsenV: Double = 0.3,
+) {
+    fun describe(): String = "coolant: warn > ${coolantHighC.toInt()} °C for ${coolantHoldMs / 1000} s, clear < ${coolantClearC.toInt()} °C for ${coolantClearMs / 1000} s\n" +
+        "voltage: warn < $voltageLowV V for ${voltageHoldMs / 1000} s with RPM > ${rpmMin.toInt()}, clear > $voltageClearV V for ${voltageClearMs / 1000} s\n" +
+        "shown ${showMs / 1000} s on / ${hideMs / 1000} s off; again at once if worse by ${worsenC.toInt()} °C / $worsenV V; stale or disconnected: none"
 }

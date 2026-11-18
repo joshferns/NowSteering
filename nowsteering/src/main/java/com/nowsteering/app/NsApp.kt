@@ -17,6 +17,7 @@ class NsApp : Application() {
         lateinit var instance: NsApp
         lateinit var watcher: SessionWatcher
         lateinit var torque: TorqueClient
+        val trip = TripTracker()
     }
 
     private var lastPlayers = ""

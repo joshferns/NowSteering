@@ -9,6 +9,8 @@ object Prefs {
 
     fun init(ctx: Context) {
         sp = ctx.getSharedPreferences("ns", Context.MODE_PRIVATE)
+        // 0.6.0: Keep on screen is ON for a new install. An install that already existed keeps what it had (off, if never set).
+        if (!sp.contains("keepOnScreen")) sp.edit().putBoolean("keepOnScreen", sp.all.isEmpty()).apply()
     }
 
     var carAddress: String?
@@ -47,9 +49,9 @@ object Prefs {
         get() = sp.getBoolean("tripBar", true)
         set(v) = sp.edit().putBoolean("tripBar", v).apply()
 
-    /** Re-claim the car (screen + wheel buttons) whenever another app starts playing. Off by default. */
+    /** Re-claim the car (screen + wheel buttons) whenever another app starts playing. On for new installs (0.6.0), unchanged for existing ones. */
     var keepOnScreen: Boolean
-        get() = sp.getBoolean("keepOnScreen", false)
+        get() = sp.getBoolean("keepOnScreen", false) // init() decides the first value
         set(v) = sp.edit().putBoolean("keepOnScreen", v).apply()
 
     /** Arrival clock on line 2 while far from a turn (replaces the trip bar there). Off until the width test passes. */
@@ -71,6 +73,26 @@ object Prefs {
             return SongPrefix.of(sp.getString("songPrefix", null))
         }
         set(v) = sp.edit().putString("songPrefix", v.name).apply()
+
+    /** The screen preset (Driver, Trip, Car, Classic). Driver unless the user picked another. */
+    var preset: PresetId
+        get() = PresetId.of(sp.getString("preset", null))
+        set(v) = sp.edit().putString("preset", v.name).apply()
+
+    /** Rupees per litre. Not set = no cost anywhere. */
+    var fuelPrice: Double?
+        get() = sp.getString("fuelPrice", null)?.toDoubleOrNull()?.takeIf { it > 0 }
+        set(v) = sp.edit().apply { if (v == null) remove("fuelPrice") else putString("fuelPrice", v.toString()) }.apply()
+
+    /** The user's typical km/L (optional). */
+    var typicalKmpl: Double?
+        get() = sp.getString("typicalKmpl", null)?.toDoubleOrNull()?.takeIf { it > 0 }
+        set(v) = sp.edit().apply { if (v == null) remove("typicalKmpl") else putString("typicalKmpl", v.toString()) }.apply()
+
+    /** Coolant / voltage warnings from Torque on the car screen. */
+    var engineWarnings: Boolean
+        get() = sp.getBoolean("engineWarnings", true)
+        set(v) = sp.edit().putBoolean("engineWarnings", v).apply()
 
     /** Icon signatures already written to the log, so each new Maps icon is logged once. */
     var seenIcons: Set<String>

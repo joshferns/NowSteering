@@ -26,6 +26,7 @@ class KeyLinesTest {
         assertTrue(kept.any { it.contains("[FWD]") && it.contains("DROPPED") })
         assertTrue(kept.any { it.contains("[NOTE]") })
         assertTrue(kept.any { it.contains("[TORQUE]") })
+        for (tag in listOf("TRIP", "WARN", "EXPERIMENT")) assertTrue(tag, KeyLines.filter("11-11 08:00:00.000 [$tag] x").size == 1)
         assertTrue(kept.any { it.contains("▶ Falling") })       // mirror screen
     }
 
@@ -33,7 +34,7 @@ class KeyLinesTest {
         val kept = KeyLines.filter(log)
         assertFalse(kept.any { it.contains("[MAPS]") })
         assertFalse(kept.any { it.contains("[GPS]") })
-        assertFalse(kept.any { it.contains("Now Steering'") })  // plain clock screens
+        assertTrue(kept.any { it.contains("Now Steering'") })   // 0.6.0: every screen sent to the car is kept, clock screens too
     }
 
     @Test fun collapsesRepeatedLines() {
@@ -41,7 +42,7 @@ class KeyLinesTest {
         assertEquals(1, kept.count { it.contains("metadata: title='Falling'") })
     }
 
-    @Test fun staysSmallOnABigLog() {
+    @Test fun dropsMapsNoiseOnABigLog() {
         // 750 KB of mostly per-second noise (11-12 Nov) must come out far below the old 200 000 character cut.
         val noisy = buildString {
             repeat(9000) { i -> appendLine("11-12 10:%02d:%02d.000 [SCREEN] sent '10:00 %d km/h' / 'x' / 'y'".format(i / 60 % 60, i % 60, i % 40)) }
@@ -50,6 +51,9 @@ class KeyLinesTest {
         }
         assertTrue(noisy.length > 750_000)
         val kept = KeyLines.filter(noisy)
-        assertEquals(1, kept.size)
+        // Every [SCREEN] line stays (0.6.0) and the 9000 Maps lines go; the file share has no size limit.
+        assertEquals(9001, kept.size)
+        assertFalse(kept.any { it.contains("[MAPS]") })
+        assertTrue(kept.joinToString("\n").length < 1_000_000)
     }
 }

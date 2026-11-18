@@ -13,7 +13,7 @@ sealed interface Cond {
 }
 
 /** When all [all] hold, show [face]. */
-data class Rule(val id: String, val all: List<Cond>, val face: Face)
+data class Rule(val id: String, val all: List<Cond>, val face: Face, val slot: WarnSlot = WarnSlot.NONE)
 
 /** An ordered rule list. The first rule whose conditions all hold wins; the last one has no conditions. */
 data class Preset(val name: String, val rules: List<Rule>) {
@@ -41,9 +41,15 @@ data class Settings(
     val tripBar: Boolean,
     val turnBar: Boolean,
     val songPrefix: SongPrefix,
+    val preset: PresetId = PresetId.CLASSIC,
+    /** Rupees per litre; null = not set, every cost field is missing. */
+    val fuelPrice: Double? = null,
+    /** The user's typical km/L, for people without Torque (or before Torque has a trip average). */
+    val typicalKmpl: Double? = null,
 ) {
     companion object {
-        fun fromPrefs() = Settings(Prefs.keepOnScreen, Prefs.idleSeconds, Prefs.arrivalTime, Prefs.tripBar, Prefs.turnBar, Prefs.songPrefix)
+        fun fromPrefs() = Settings(Prefs.keepOnScreen, Prefs.idleSeconds, Prefs.arrivalTime, Prefs.tripBar, Prefs.turnBar, Prefs.songPrefix,
+            Prefs.preset, Prefs.fuelPrice, Prefs.typicalKmpl)
     }
 }
 
@@ -97,12 +103,12 @@ object CurrentPreset {
             Rule("near_turn", listOf(Cond.Flag("nav.shown"), Cond.Flag("near")),
                 Face("near_turn", navTitle, farLine2, road, extra)),
             Rule("navigating", listOf(Cond.Flag("nav.shown")),
-                Face("navigating", navTitle, farLine2, songOrRoad, extra)),
+                Face("navigating", navTitle, farLine2, songOrRoad, extra), WarnSlot.LINE2),
             Rule("music_keep_on", listOf(Cond.Flag("set.keep_on"), Cond.Has("song.title")),
                 Face("music_keep_on", idleTitle, Line("▶ {song.title}", song),
-                    Line(listOf(Alt("{song.time_left} left {bar song.progress ${Bars.TRIP_CELLS}}", song), Alt("{song.artist}", song))))),
+                    Line(listOf(Alt("{song.time_left} left {bar song.progress ${Bars.TRIP_CELLS}}", song), Alt("{song.artist}", song)))), WarnSlot.LINE1),
             Rule("idle", emptyList(),
-                Face("idle", idleTitle, Line("Now Steering"), Line("{date}"))),
+                Face("idle", idleTitle, Line("Now Steering"), Line("{date}")), WarnSlot.LINE1),
         )
         return Preset(NAME, rules)
     }
@@ -118,8 +124,8 @@ class WarningLayer {
     fun active(now: Long): Face? = face?.takeIf { now < until }
 
     companion object {
-        // Screen("a", "b", "c") in the old code was (title, artist = line 3, album = line 2).
-        val POWER_SAVING = Face.literal("power_saving", "Power saving on", line2 = "turn it off", line3 = "nav less smooth")
+        // 0.6.0: reading order (it was line 2 "turn it off", line 3 "nav less smooth" in 0.2.x to 0.5.0).
+        val POWER_SAVING = Face.literal("power_saving", "Power saving on", line2 = "nav less smooth", line3 = "turn it off")
         val NAV_ENDED = Face.literal("nav_ended", "Nav ended")
         val NO_MUSIC_APP = Face.literal("no_music_app", "No music app", line3 = "Start music first")
         val NO_MUSIC_LINK = Face.literal("no_music_link", "No music link", line2 = "in Now Steering app", line3 = "Grant notif access")

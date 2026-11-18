@@ -27,6 +27,8 @@ class DiagnosticsActivity : BaseActivity() {
     private lateinit var navView: TextView
     private lateinit var sessionsView: TextView
     private lateinit var torqueView: TextView
+    private lateinit var warnView: TextView
+    private lateinit var experimentView: TextView
     private lateinit var logView: TextView
     private val inputs = ArrayList<EditText>()
 
@@ -64,7 +66,21 @@ class DiagnosticsActivity : BaseActivity() {
                 }
             }.toTypedArray())
         }
+        row(button("Test HOT warning") { testWarning(Warn(WarnKind.HOT, 107.0)) },
+            button("Test LOW warning") { testWarning(Warn(WarnKind.LOW, 12.0)) })
         row(button("Back to live") { SteeringService.instance?.backToLive() })
+
+        section("Engine warnings and trip (read-only)")
+        warnView = mono(12f)
+        note("Thresholds live in the car profile: ${CarProfile.current.name}.")
+
+        section("Play-button experiment")
+        note("Reports our session as PAUSED for 10 s. Press Play on the head unit during that time; the log says whether a PLAY key reached us. Normal behaviour is unchanged.")
+        experimentView = mono(12f)
+        row(button("Start Play experiment (10 s)") {
+            val s = SteeringService.instance ?: return@button toast("Service is off")
+            s.startPlayExperiment()
+        })
 
         section("Song on the nav screen")
         note("Glyph before the song name. ▶ is proven on the car; ♪ and ♫ show as dots.")
@@ -171,6 +187,25 @@ class DiagnosticsActivity : BaseActivity() {
                 "eta='${i.text.eta}' left='${i.text.remaining}'\nicon=${i.iconHex?.take(24) ?: "none"}…"
         sessionsView.text = NsApp.watcher.summary()
         torqueView.text = torqueText()
+        warnView.text = warnText()
+        experimentView.text = if (s?.experimentRunning == true) "RUNNING: press Play on the head unit now" else "not running"
+    }
+
+    private fun testWarning(w: Warn) {
+        val svc = SteeringService.instance ?: return toast("Service is off")
+        svc.showTest(Screen.lines(w.text(), "Test only", "Back to live clears", line2Max = 20, line3Max = 20).copy(titleMax = CarProfile.current.measuredTitle))
+    }
+
+    private fun warnText(): String {
+        val s = SteeringService.instance
+        val t = NsApp.trip
+        return buildString {
+            append(CarProfile.current.warnings.describe()).append("\n\n")
+            append("warnings active: ").append(s?.warnActive?.joinToString { it.text() }?.ifEmpty { "none" } ?: "(service off)").append('\n')
+            append("engine warnings setting: ").append(if (Prefs.engineWarnings) "on" else "off").append('\n')
+            append("trip: ").append(if (t.active) String.format(java.util.Locale.US, "%.2f km", t.distanceKm) else "not running")
+            append("   fuel price: ").append(Prefs.fuelPrice?.toString() ?: "not set")
+        }
     }
 
     private fun torqueText(): String {

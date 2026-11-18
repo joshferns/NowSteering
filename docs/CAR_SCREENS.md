@@ -13,6 +13,112 @@ TODO: add a photo of each screen to confirm every row.
 
 In the mock-ups, `[ ]` marks a line that is empty. Fonts are proportional, so lengths are in characters, not columns.
 
+## 0. Presets (0.6.0): which screens you get
+
+The sections below describe the screens of the **Classic** preset (exactly the 0.5.0 screens). Since 0.6.0 the default is **Driver**. A preset changes the faces, not the priority order, which is the same for all: Arrived, Rerouting, near a turn (enter 300 m, leave 340 m), navigating, music (Keep on screen), idle. Double Next cycles Driver → Trip → Car (only when Torque is installed) → Classic and shows the name on line 1 for 2 s. Line 1 in Driver, Trip and Car may use the car's full 17 characters; lines 2 and 3 use 20.
+
+A part of a line that needs a missing value is dropped (no dashes); a value older than its limit counts as missing. Mock-ups below are the preview in the app (sample values: 42 km/h, 17:03, a song with 2:31 left, a turn in 2.4 km, Torque 84 °C, 14.2 V, 14.6 km/L, fuel Rs 100/L).
+
+### Driver (default)
+
+**1  17:03 42 km/h**
+
+```
+    L2  Sat 14 Nov
+    L3  Now Steering
+```
+
+**Music playing (Keep on screen)**
+
+```
+    L1  42 km/h 17:03
+    L2  ▶ Falling - Trevor
+    L3  2:31 left ██▒▒▒▒
+```
+
+**Navigating, music playing**
+
+```
+    L1  ↗ 2.4 km 42 km/h
+    L2  ▶ Falling - Trevor
+    L3  2:31 left ██▒▒▒▒
+```
+
+**Navigating, no music**
+
+```
+    L1  ↗ 2.4 km 42 km/h
+    L2  23 min ▒▒▒▒▒▒
+    L3  Outer Ring Rd
+```
+
+**Last 300 m before a turn**
+
+```
+    L1  ↗ 250 m
+    L2  ↗ ██▒▒▒▒▒▒▒▒
+    L3  42 km/h ▶ 2:31
+```
+
+**Rerouting**
+
+```
+    L1  • Rerouting...
+    L2  [ ]
+    L3  [ ]
+```
+
+**Arrived**
+
+```
+    L1  ● Arrived
+    L2  18:05
+    L3  Hosur Rd
+```
+
+**Coolant warning on idle**
+
+```
+    L1  ▲ HOT 107°C
+    L2  Sat 14 Nov
+    L3  Now Steering
+```
+
+Line 1 far from a turn tries `↗ 2.4 km 42 km/h`, then drops ` km/h`, then the speed (`← 12.5 km 120`), so it always fits 17.
+
+### Trip
+
+Only the lines that differ from Driver:
+
+```
+Navigating (far)
+    L1  ↗ 2.4 km
+    L2  23 min ▒▒▒▒▒▒
+    L3  Rs 125 trip · 48 now      (or "Rs ~125 trip · ~48 now" when that fits 20, or "Rs ~125 trip", or the road if no fuel price is set)
+```
+
+### Car
+
+Idle line 2 and music line 3 show Torque's numbers (km/L is dropped first, then voltage; the date or time-left bar when Torque has nothing fresh):
+
+```
+Idle                              Music playing
+    L1  17:03 42 km/h                 L1  42 km/h 17:03
+    L2  84°C 14.2V 14.6km/L           L2  ▶ Falling - Trevor
+    L3  Now Steering                  L3  84°C 14.2V 14.6km/L
+```
+
+### Warnings (all presets)
+
+Coolant above 105 °C for 5 s: `▲ HOT 107°C`. Voltage below 12.2 V for 10 s with the engine running: `▲ LOW 12.0V`. It replaces line 1 on idle and music screens and line 2 on navigation screens; it is held in the last 300 m before a turn and shown right after. 10 s on, 50 s off while it lasts; at once if worse by 3 °C / 0.3 V; both active alternate.
+
+```
+Idle with a warning                   Navigating with a warning
+    L1  ▲ HOT 107°C                       L1  ↗ 2.4 km 42 km/h
+    L2  Sat 14 Nov                        L2  ▲ HOT 107°C
+    L3  Now Steering                      L3  Outer Ring Rd
+```
+
 ## 1. Idle: clock and speed
 
 Shown when not navigating (and Keep on screen is off, or nothing is playing).
@@ -77,6 +183,8 @@ Appears when Maps shows its destination marker with ≤ 30 m left, or Maps ends 
 Stays until: the car stops and then exceeds 10 km/h, or the phone's location moves 300 m (works without GPS), or a new trip starts, or double Next, or 20 min, or the car disconnects.
 
 ## 7. Notices (timed overlays, highest priority)
+
+(0.6.0: the Power saving notice now reads `Power saving on` / `nav less smooth` / `turn it off`, top to bottom; the table below is the 0.5.0 order. A 2 s notice shows the preset name on line 1 when you double-tap Next.)
 
 | Screen | L1 | L2 | L3 | For | When |
 |---|---|---|---|---|---|

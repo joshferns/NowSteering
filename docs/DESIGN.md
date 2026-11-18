@@ -166,6 +166,14 @@ flowchart LR
 
 Not changed: dead reckoning, claim rules, buttons, call safeguard, settings and their defaults, logging.
 
+### Presets, trip cost and warnings (0.6.0)
+
+- **Presets** (`PresetLibrary.kt`): `Driver`, `Trip`, `Car` and `Classic` are rule lists built from the settings. Classic is the 0.5.0 preset unchanged (still checked by the golden test). Driver, Trip and Car share rules and most faces; Trip changes the navigating face (cost line), Car changes idle line 2 and music line 3. The rules are the same order for all (arrived, rerouting, near turn, navigating with music, navigating, music, idle). Line 1 of the modern presets uses 17 characters; a line can list alternatives and each may say "only if it fits N characters once cleaned for the car", which is how `← 12.5 km 120 km/h` falls back to `← 12.5 km 120`.
+- **Trip cost** (`Trip.kt`): pure maths (`TripMath`) from fuel used, the km/L source (trip average after 2 km, else long-term, else the user's typical) and Maps' distance left; `TripTracker` follows the Bluetooth connect/disconnect and the GPS distance. See [FIELDS.md](FIELDS.md#trip-cost-060).
+- **Warning layer** (`Warnings.kt`): `WarningMonitor` decides what is active (coolant > 105 °C for 5 s, clear < 102 °C for 5 s; voltage < 12.2 V for 10 s with RPM > 500, clear > 12.6 V for 5 s; a missing or stale reading, or a stopped engine, clears at once). `WarningPresenter` decides what is on the car (10 s on, 50 s off, at once when new or worse by 3 °C / 0.3 V, alternating when both, held while the face has no slot). Each rule names its slot: line 1 on idle and music, line 2 on navigating, none near a turn / Arrived / Rerouting. The thresholds are in the car profile and shown read-only in Diagnostics. Notices (Power saving, preset name, ...) and test screens sit above warnings.
+- **Double Next** cycles the preset (and clears the Arrived screen first); the old nav / clock toggle is gone.
+- **Play experiment**: Diagnostics can report the session as PAUSED for 10 s and logs `[EXPERIMENT]` lines for any key that arrives.
+
 ### How "identical" is proved
 
 `LegacyScreens` (test code) is the v0.4.0 screen code copied unchanged. `GoldenTest` runs it and the new pipeline side by side on 40 000 frames built from every Maps notification (485) and song (89) in the recorded logs, with every setting combination, random speed, distance-to-turn walks across 300 / 340 m, trip, song length and arrival states: the text sent to the car is identical in every frame. It also rebuilds all 754 idle screens in the recorded logs from the clock, date and speed on each line. The only difference before cleaning is a stray space when Maps gives no arrow glyph (cleaning removes it).
@@ -181,6 +189,7 @@ Known quirks kept on purpose (identical rule): the Power saving notice has its t
 | `NavText.kt`, `IconSig.kt` | parsing text and arrow icons |
 | `DeadReckoner.kt`, `Bars.kt`, `Layouts.kt` | distance rules, bars, turn zone (`Layouts.songText / farLine2 / mirrorLine3` are the v0.4.0 line builders, now used only by the golden test) |
 | `Fields.kt`, `LiveFields.kt`, `Template.kt`, `Rules.kt`, `CarProfile.kt` | v2: fields, templates and faces, rules and the Current preset, warning layer, car profile (see "v2 model") |
+| `PresetLibrary.kt`, `PresetPreview.kt`, `Trip.kt`, `Warnings.kt` | 0.6.0: the Driver / Trip / Car presets and the phone preview, trip cost and tracker, warning monitor / presenter |
 | `TorqueClient.kt`, `TorquePid.kt` | read-only Torque Pro probe; `TorqueFields` maps PIDs to `car.*` fields |
 | `DisplayEngine.kt`, `Glyphs.kt` | widths, glyph fallback, rate limit |
 | `SessionWatcher.kt` | other apps' media sessions, song info, takeover events |

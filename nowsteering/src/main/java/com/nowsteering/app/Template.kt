@@ -99,7 +99,7 @@ object Template {
 /**
  * One way to write a line. The first alternative that renders non-empty wins, so a line can fall back
  * ("time + bar", then "time", then "bar"). [max] is the width of the line when this alternative is used.
- * [fitsIn] makes it count only if its text is that short (raw length, before cleaning).
+ * [fitsIn] makes it count only if its text is that short once cleaned for the car.
  */
 data class Alt(val template: String, val max: Int? = null, val fitsIn: Int? = null)
 
@@ -107,12 +107,12 @@ data class Alt(val template: String, val max: Int? = null, val fitsIn: Int? = nu
 data class Line(val alts: List<Alt>) {
     constructor(template: String, max: Int? = null) : this(listOf(Alt(template, max)))
 
-    /** The text and the width it is cut to. */
-    fun render(fields: Fields, defaultMax: Int): Pair<String, Int> {
+    /** The text and the width it is cut to. [fitsIn] is checked on the text as the car would get it (cleaned, spaces collapsed). */
+    fun render(fields: Fields, defaultMax: Int, extra: String = ""): Pair<String, Int> {
         for (a in alts) {
             val t = Template.render(a.template, fields)
             if (t.isEmpty()) continue
-            if (a.fitsIn != null && t.length > a.fitsIn) continue
+            if (a.fitsIn != null && Glyphs.sanitize(t, 999, extra).length > a.fitsIn) continue
             return t to (a.max ?: defaultMax)
         }
         return "" to (alts.lastOrNull()?.max ?: defaultMax)
@@ -134,9 +134,9 @@ data class Face(
     val profile: CarProfile = CarProfile.current,
 ) {
     fun render(fields: Fields): Screen {
-        val (t, tMax) = line1.render(fields, profile.safeTitle)
-        val (l2, l2Max) = line2.render(fields, profile.safeLine)
-        val (l3, l3Max) = line3.render(fields, profile.safeLine)
+        val (t, tMax) = line1.render(fields, profile.safeTitle, extra)
+        val (l2, l2Max) = line2.render(fields, profile.safeLine, extra)
+        val (l3, l3Max) = line3.render(fields, profile.safeLine, extra)
         return Screen(t, artist = l3, album = l2, titleMax = tMax, artistMax = l3Max, albumMax = l2Max, extra = extra)
     }
 

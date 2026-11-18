@@ -64,7 +64,7 @@ class SteeringService : Service() {
         }
     }
 
-    enum class Mode { AUTO, IDLE_WHILE_NAV, TEST }
+    enum class Mode { AUTO, TEST }
 
     /** How each text change reaches the car. METADATA_ONLY was proven parked with the phone unlocked. */
     enum class RefreshStyle(val label: String) {
@@ -131,7 +131,7 @@ class SteeringService : Service() {
         engine = DisplayEngine { s -> sendToCar(s) }
         buttons = Buttons(
             onNext = { forward("next") { it.skipToNext() } },
-            onDoubleNext = { toggleNavIdle() },
+            onDoubleNext = { doubleNext() },
             onPrevious = { forward("previous") { it.skipToPrevious() } },
             onPlayPause = { k -> togglePlayback(k) },
         )
@@ -141,6 +141,7 @@ class SteeringService : Service() {
         NsApp.watcher.onSongChange = { pkg -> claimSoon("song change in ${SessionWatcher.short(pkg)}") }
         NsApp.watcher.onOtherStartedPlaying = { pkg -> claimSoon("${SessionWatcher.short(pkg)} started playing") }
         startLocation()
+        if (!NsApp.trip.active) NsApp.trip.start("service start")   // normally already started by the car's Bluetooth connect
         // Keep the CPU running with the screen off; only held while the car is connected.
         wakeLock = getSystemService(android.os.PowerManager::class.java)
             .newWakeLock(android.os.PowerManager.PARTIAL_WAKE_LOCK, "NowSteering:car").apply { acquire() }
@@ -239,10 +240,45 @@ class SteeringService : Service() {
     }
 
     private fun setPlaying() {
+        val paused = SystemClock.elapsedRealtime() < expUntil
         session.setPlaybackState(PlaybackState.Builder()
             .setActions(ACTIONS)
-            .setState(PlaybackState.STATE_PLAYING, 0, 1f)
+            .setState(if (paused) PlaybackState.STATE_PAUSED else PlaybackState.STATE_PLAYING, 0, if (paused) 0f else 1f)
             .build())
+    }
+
+    // ---- Play-button experiment (Diagnostics only) ----
+    // Does the head unit's Play key ever reach us if we report PAUSED? It only ever sent PAUSE so far.
+    private var expUntil = 0L
+    private var expStartedAt = 0L
+    private var expPlayAt: Long? = null
+    private val expKeys = ArrayList<String>()
+
+    val experimentRunning get() = SystemClock.elapsedRealtime() < expUntil
+
+    fun startPlayExperiment() {
+        if (experimentRunning || callGuard.inCall) return
+        expStartedAt = SystemClock.elapsedRealtime()
+        expUntil = expStartedAt + 10_000
+        expPlayAt = null
+        expKeys.clear()
+        NsLog.log("EXPERIMENT", "Play experiment: session reported PAUSED for 10 s. Press Play on the head unit now")
+        setPlaying()
+        main.postDelayed({
+            expUntil = 0
+            setPlaying()
+            NsLog.log("EXPERIMENT", "Play experiment over: PLAY key arrived=${expPlayAt != null}" +
+                (expPlayAt?.let { " (${it - expStartedAt} ms after PAUSED)" } ?: "") + "; keys seen: ${expKeys.ifEmpty { listOf("none") }.joinToString()}")
+        }, 10_000)
+    }
+
+    private fun noteExperimentKey(ke: KeyEvent) {
+        if (!experimentRunning || ke.action != KeyEvent.ACTION_DOWN) return
+        val name = KeyEvent.keyCodeToString(ke.keyCode).removePrefix("KEYCODE_")
+        expKeys += name
+        val isPlay = ke.keyCode == KeyEvent.KEYCODE_MEDIA_PLAY || ke.keyCode == KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE
+        if (isPlay && expPlayAt == null) expPlayAt = SystemClock.elapsedRealtime()
+        NsLog.log("EXPERIMENT", "key during the experiment: $name ${SystemClock.elapsedRealtime() - expStartedAt} ms after PAUSED")
     }
 
     private val screenReceiver = object : android.content.BroadcastReceiver() {
@@ -409,7 +445,6 @@ class SteeringService : Service() {
             shownNav = null
             pendingNav = null
             main.removeCallbacks(settle)
-            if (mode == Mode.IDLE_WHILE_NAV) mode = Mode.AUTO
             val last = lastNav
             lastNav = null
             if (arrived != null) {
@@ -495,19 +530,18 @@ class SteeringService : Service() {
         refreshScreen()
     }
 
-    private fun toggleNavIdle() {
+    /** Double Next (when the button reaches us): clear the Arrived screen, otherwise cycle to the next preset. */
+    private fun doubleNext() {
         if (mode == Mode.TEST) return
         if (arrived != null) {
             clearArrived("double Next")
             return
         }
-        if (!NavState.active) {
-            NsLog.log("SCREEN", "double Next: not navigating, staying on idle")
-            return
-        }
-        mode = if (mode == Mode.AUTO) Mode.IDLE_WHILE_NAV else Mode.AUTO
-        NsLog.log("SCREEN", "double Next: now showing ${if (mode == Mode.AUTO) "nav" else "idle"}")
-        refreshScreen()
+        val torque = NsApp.torque.snapshot.install != TorqueClient.Install.NONE
+        val next = PresetId.next(Prefs.preset, torque)
+        Prefs.preset = next
+        NsLog.log("SCREEN", "double Next: preset ${next.label}")
+        showNotice(Face.literal("preset_name", next.label), 2000)
     }
 
     fun showTest(s: Screen) {
@@ -533,8 +567,8 @@ class SteeringService : Service() {
     private fun refreshScreen(force: Boolean = false) {
         val warning = warnings.active(SystemClock.elapsedRealtime())
         val s = when {
-            warning != null -> warning.render(Fields())
-            mode == Mode.TEST -> testScreen ?: resolveScreen(idleOnly = true)
+            warning != null -> { lastSlot = WarnSlot.NONE; warning.render(Fields()) }
+            mode == Mode.TEST -> { lastSlot = WarnSlot.NONE; testScreen ?: resolveScreen(idleOnly = true) }
             else -> resolveScreen()
         }
         engine.show(s, force)
@@ -557,9 +591,41 @@ class SteeringService : Service() {
             toTurnMeters = { dr.shown() },
             tripMeters = tripMeters,
             song = { currentSong() },
+            tripKm = if (NsApp.trip.active) NsApp.trip.distanceKm else null,
             other = ::otherField,
         )
-        return CurrentPreset.build(settings).resolve(LiveContext(inputs, zone))
+        val live = LiveContext(inputs, zone)
+        val rule = PresetLibrary.build(settings).pick(live)
+        lastSlot = rule.slot
+        val screen = rule.face.render(live.fields)
+        val w = warnShown
+        return if (w != null) Warnings.apply(screen, rule.slot, w) else screen
+    }
+
+    private var lastSlot = WarnSlot.NONE
+    private var warnShown: Warn? = null
+    private val warnMonitor = WarningMonitor(log = { NsLog.log("WARN", it.removePrefix("[WARN] ")) })
+    private val warnPresenter = WarningPresenter(log = { NsLog.log("WARN", it.removePrefix("[WARN] ")) })
+    @Volatile var warnActive: List<Warn> = emptyList()
+        private set
+    private var lastTripLogAt = 0L
+
+    /** Once a second: engine warnings from Torque, and the trip numbers. */
+    private fun tickCarData() {
+        val now = SystemClock.elapsedRealtime()
+        val f = Fields(CarProfile.current.neverShow, ::otherField)
+        // Trip bookkeeping first (it also feeds the [TRIP] log).
+        val navLeft = if (NavState.active) NavState.info?.text?.remaining?.let { NavTextParser.metersOf(it) }?.div(1000.0) else null
+        val tin = TripInputs(Prefs.fuelPrice, Prefs.typicalKmpl, NsApp.trip.distanceKm, f.number("car.fuel_used"),
+            f.number("car.trip_kmpl"), f.number("car.kmpl_longterm"), navLeft)
+        NsApp.trip.observe(tin, TripMath.compute(tin))
+        if (now - lastTripLogAt >= 60_000) { lastTripLogAt = now; NsApp.trip.logPeriodic() }
+        // Warnings.
+        val active = if (Prefs.engineWarnings && callGuard.inCall.not())
+            warnMonitor.update(now, f.number("car.coolant"), f.number("car.voltage"), f.number("car.rpm")) else emptyList()
+        warnActive = active
+        val canShow = lastSlot != WarnSlot.NONE && mode != Mode.TEST && warnings.active(now) == null
+        warnShown = warnPresenter.update(now, active, canShow)
     }
 
     /** Fields from sources the pure layer does not know: the phone battery and Torque's car data. */
@@ -586,6 +652,7 @@ class SteeringService : Service() {
     private val ticker = object : Runnable {
         override fun run() {
             checkGpsStale()
+            tickCarData()
             if (arrived != null && SystemClock.elapsedRealtime() - arrivedAt > 20 * 60_000) clearArrived("20 min since arrival")
             refreshScreen() // engine skips it unless the text changed
             main.postDelayed(this, 1000)
@@ -598,7 +665,7 @@ class SteeringService : Service() {
         if (loc.hasSpeed()) {
             val now = SystemClock.elapsedRealtime()
             // Only count distance between fixes that are close together (GPS gaps are not guessed over).
-            if (now - speedAt <= 3000) dr.onSpeed(speedMps.toDouble(), now - speedAt)
+            if (now - speedAt <= 3000) { dr.onSpeed(speedMps.toDouble(), now - speedAt); NsApp.trip.addMeters(speedMps * (now - speedAt) / 1000.0) }
             speedMps = loc.speed
             val k = (loc.speed * 3.6f).roundToInt()
             speedKmh = if (k < 2) 0 else k
@@ -703,6 +770,7 @@ class SteeringService : Service() {
                 return super.onMediaButtonEvent(intent)
             }
             lastKeyAt = SystemClock.elapsedRealtime()
+            noteExperimentKey(ke)
             val action = if (ke.action == KeyEvent.ACTION_DOWN) "DOWN" else if (ke.action == KeyEvent.ACTION_UP) "UP" else "action${ke.action}"
             NsLog.log("KEY", "${KeyEvent.keyCodeToString(ke.keyCode)} (${ke.keyCode}) $action repeat=${ke.repeatCount}")
             return buttons.onKey(ke) || super.onMediaButtonEvent(intent)

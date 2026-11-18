@@ -46,8 +46,15 @@ object FieldCatalog {
         d("car.coolant", Source.TORQUE, "°C", TORQUE_MAX_AGE_MS, "Engine coolant temperature (PID 05)"),
         d("car.voltage", Source.TORQUE, "V", TORQUE_MAX_AGE_MS, "Control module voltage (PID 42, not the adapter's Volts(Ad))"),
         d("car.rpm", Source.TORQUE, "rpm", TORQUE_MAX_AGE_MS, "Engine speed (PID 0c)"),
-        d("car.trip_kmpl", Source.TORQUE, "km/l", TORQUE_MAX_AGE_MS, "Trip average fuel economy (Torque 'Trip KPL', not the long-term KPL(avg))"),
-        d("car.fuel_used", Source.TORQUE, "l", TORQUE_MAX_AGE_MS, "Fuel used this trip"),
+        d("car.trip_kmpl", Source.TORQUE, "km/l", TORQUE_MAX_AGE_MS, "Trip average fuel economy (PID ff1206, not the long-term KPL(avg))"),
+        d("car.fuel_used", Source.TORQUE, "l", TORQUE_MAX_AGE_MS, "Fuel used this trip (PID ff1271)"),
+        d("car.kmpl_longterm", Source.TORQUE, "km/l", TORQUE_MAX_AGE_MS, "Long-term average km/L (PID ff5202)"),
+        d("trip.distance", Source.PHONE, "km", null, "Kilometres driven since the car connected (GPS)"),
+        d("trip.kmpl", Source.TORQUE, "km/l", null, "km/L used for the cost maths"),
+        d("trip.cost", Source.TORQUE, "Rs", null, "Fuel cost so far this trip"),
+        d("trip.cost_to_go", Source.MAPS, "Rs", null, "Fuel cost of the distance still to go"),
+        d("trip.cost_total", Source.MAPS, "Rs", null, "Cost so far plus cost to go"),
+        d("trip.cost_per_10km", Source.TORQUE, "Rs", null, "What 10 km costs at the km/L used"),
     )
 
     private val byName = all.associateBy { it.name }
@@ -70,12 +77,19 @@ class Fields(
 ) {
     private val cache = HashMap<String, FieldValue?>()
 
-    fun get(name: String): FieldValue? = cache.getOrPut(name) {
-        if (name in neverShow) return@getOrPut null
-        val v = read(name) ?: return@getOrPut null
-        if (v.text.isBlank()) return@getOrPut null
+    fun get(name: String): FieldValue? {
+        if (cache.containsKey(name)) return cache[name]
+        val v = resolve(name)
+        cache[name] = v
+        return v
+    }
+
+    private fun resolve(name: String): FieldValue? {
+        if (name in neverShow) return null
+        val v = read(name) ?: return null
+        if (v.text.isBlank()) return null
         val limit = FieldCatalog.maxAgeMs(name)
-        if (limit != null && v.ageMs >= limit) null else v
+        return if (limit != null && v.ageMs >= limit) null else v
     }
 
     fun text(name: String): String? = get(name)?.text

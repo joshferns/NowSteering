@@ -90,8 +90,8 @@ class RulesTest {
     }
 
     @Test fun existingNoticesKeepTheirOldRows() {
-        // v0.4.0: Screen("Power saving on", "nav less smooth", "turn it off") = title, artist (line 3), album (line 2).
-        assertEquals("'Power saving on' / 'turn it off' / 'nav less smooth'", WarningLayer.POWER_SAVING.render(Fields()).toString())
+        // 0.6.0: the Power saving notice reads top to bottom (it was reversed from 0.2.x to 0.5.0).
+        assertEquals("'Power saving on' / 'nav less smooth' / 'turn it off'", WarningLayer.POWER_SAVING.render(Fields()).toString())
         assertEquals("'No music app' / '' / 'Start music first'", WarningLayer.NO_MUSIC_APP.render(Fields()).toString())
         assertEquals("'No music link' / 'in Now Steering app' / 'Grant notif access'", WarningLayer.NO_MUSIC_LINK.render(Fields()).toString())
         assertEquals("'Nav ended' / '' / ''", WarningLayer.NAV_ENDED.render(Fields()).toString())
